@@ -24,6 +24,7 @@ struct MenuBarView: View {
             case .hidden, .permissionDenied:
                 Text("Hold \(Image(systemName: "globe")) (Fn) to dictate")
                     .font(.body)
+                    .foregroundStyle(.white.opacity(0.5))
             }
         }
         .padding(8)
