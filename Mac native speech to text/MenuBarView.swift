@@ -22,7 +22,7 @@ struct MenuBarView: View {
                 Text("Processing...")
                     .font(.headline)
             case .hidden, .permissionDenied:
-                Text("Hold ⌃⌥ (Ctrl+Option) to dictate")
+                Text("Hold \(Image(systemName: "globe")) (Fn) to dictate")
                     .font(.body)
             }
         }

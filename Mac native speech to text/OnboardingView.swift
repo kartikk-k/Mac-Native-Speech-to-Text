@@ -15,7 +15,7 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 8) {
-                Image(systemName: "mic.badge.waveform")
+                Image(systemName: "mic.fill")
                     .font(.system(size: 40))
                     .foregroundStyle(.blue)
 

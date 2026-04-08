@@ -26,6 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         mainWindowController = MainWindowController(usageTracker: usageTracker, permissionManager: permissionManager)
 
         appState.onHide = { [weak self] in
+            self?.hotkeyMonitor?.isHandsFree = false
             self?.overlayController?.hideImmediately()
         }
 
@@ -49,12 +50,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 } else {
                     self.appState.stopListening()
                 }
+            },
+            onHandsFreeToggle: { [weak self] in
+                guard let self = self else { return }
+                self.toggleHandsFree()
             }
         )
         hotkeyMonitor?.start()
 
         // Show main window on launch (permission setup is embedded in the main window)
         showMainWindow()
+    }
+
+    private func toggleHandsFree() {
+        if hotkeyMonitor?.isHandsFree == true {
+            // Turn off hands-free: stop listening and process
+            print("[AppDelegate] Hands-free OFF")
+            hotkeyMonitor?.isHandsFree = false
+            appState.stopListening()
+        } else {
+            // Turn on hands-free: keep current session running (if already listening)
+            print("[AppDelegate] Hands-free ON")
+            hotkeyMonitor?.isHandsFree = true
+            if appState.phase != .listening {
+                // Only start a new session if not already recording
+                appState.startListening()
+                overlayController?.show()
+            }
+        }
     }
 
     func showOnboarding() {

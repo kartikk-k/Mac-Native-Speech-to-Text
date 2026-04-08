@@ -46,7 +46,7 @@ struct HomeTabView: View {
                                 Text("No dictations yet")
                                     .font(.system(size: 13.5))
                                     .foregroundStyle(.white)
-                                Text("Hold ⌃⌥ (Ctrl+Option) anywhere to start dictating.")
+                                Text("Hold \(Image(systemName: "globe")) (Fn) anywhere to start dictating.")
                                     .font(.system(size: 11))
                                     .foregroundStyle(Color.white.opacity(0.40))
                             }
@@ -66,11 +66,11 @@ struct HomeTabView: View {
 
                 dsCard {
                     VStack(alignment: .leading, spacing: 10) {
-                        instructionRow(step: "1", text: "Hold ⌃⌥ (Ctrl+Option) to start recording")
+                        instructionRow(step: "1", text: Text("Hold \(Image(systemName: "globe")) (Fn) to start recording"))
                         dsDivider()
-                        instructionRow(step: "2", text: "Speak naturally — the indicator shows recording state")
+                        instructionRow(step: "2", text: Text("Speak naturally — release to transcribe and insert"))
                         dsDivider()
-                        instructionRow(step: "3", text: "Release the keys to convert and insert text")
+                        instructionRow(step: "3", text: Text("Press \(Image(systemName: "globe")) + Space for hands-free mode"))
                     }
                 }
 
@@ -120,7 +120,7 @@ struct HomeTabView: View {
         }
     }
 
-    private func instructionRow(step: String, text: String) -> some View {
+    private func instructionRow(step: String, text: Text) -> some View {
         HStack(spacing: 12) {
             Text(step)
                 .font(.system(size: 11, weight: .medium))
@@ -130,7 +130,7 @@ struct HomeTabView: View {
                     Circle()
                         .fill(Color.white.opacity(0.15))
                 )
-            Text(text)
+            text
                 .font(.system(size: 13.5))
                 .foregroundStyle(.white)
         }

@@ -14,20 +14,20 @@ struct SettingsTabView: View {
     @State private var showIndicator: Bool = UserDefaults.standard.object(forKey: "setting_showIndicator") as? Bool ?? true
     @State private var onDeviceOnly: Bool = UserDefaults.standard.object(forKey: "setting_onDeviceOnly") as? Bool ?? true
     @State private var selectedLanguage: String = "en-US"
-
+    
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }
-
+    
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-
+                
                 Text("Settings")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(.white)
                     .padding(.bottom, 20)
-
+                
                 // MARK: General
                 dsCard {
                     HStack {
@@ -52,38 +52,38 @@ struct SettingsTabView: View {
                         }
                     }
                 }
-
+                
                 dsSectionHeader(icon: "mic.fill", title: "Recognition")
-
+                
                 dsCard {
-                    dsToggleRow(
-                        icon: "waveform",
-                        title: "Show Indicator Bar",
-                        subtitle: "Display the overlay pill while recording",
-                        binding: $showIndicator
-                    )
-                    .onChange(of: showIndicator) { _, newValue in
-                        UserDefaults.standard.set(newValue, forKey: "setting_showIndicator")
-                    }
-
-                    dsDivider()
-
-                    dsToggleRow(
-                        icon: "cpu",
-                        title: "On-device Only",
-                        subtitle: "Use on-device recognition, no data sent to Apple",
-                        binding: $onDeviceOnly
-                    )
-                    .onChange(of: onDeviceOnly) { _, newValue in
-                        UserDefaults.standard.set(newValue, forKey: "setting_onDeviceOnly")
-                    }
-
-                    dsDivider()
-
+                    //                    dsToggleRow(
+                    //                        icon: "waveform",
+                    //                        title: "Show Indicator Bar",
+                    //                        subtitle: "Display the overlay pill while recording",
+                    //                        binding: $showIndicator
+                    //                    )
+                    //                    .onChange(of: showIndicator) { _, newValue in
+                    //                        UserDefaults.standard.set(newValue, forKey: "setting_showIndicator")
+                    //                    }
+                    //
+                    //                    dsDivider()
+                    //
+                    //                    dsToggleRow(
+                    //                        icon: "cpu",
+                    //                        title: "On-device Only",
+                    //                        subtitle: "Use on-device recognition, no data sent to Apple",
+                    //                        binding: $onDeviceOnly
+                    //                    )
+                    //                    .onChange(of: onDeviceOnly) { _, newValue in
+                    //                        UserDefaults.standard.set(newValue, forKey: "setting_onDeviceOnly")
+                    //                    }
+                    //
+                    //                    dsDivider()
+                    
                     dsPickerRow(title: "Language", value: selectedLanguage == "en-US" ? "English (US)" : selectedLanguage, options: ["English (US)"]) { _ in }
-
+                    
                     dsDivider()
-
+                    
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Hotkey")
@@ -94,20 +94,23 @@ struct SettingsTabView: View {
                                 .foregroundStyle(Color.white.opacity(0.40))
                         }
                         Spacer()
-                        Text("⌃⌥")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.70))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .fill(Color.white.opacity(0.08))
-                            )
+                        HStack(spacing: 4) {
+                            Image(systemName: "globe")
+                            Text("Fn")
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.70))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                        )
                     }
                 }
-
+                
                 dsSectionHeader(icon: "lock.shield", title: "Permissions")
-
+                
                 dsCard {
                     settingsPermissionRow(
                         icon: "mic.fill",
@@ -137,9 +140,9 @@ struct SettingsTabView: View {
                 .onDisappear {
                     permissionManager.stopPollingAccessibility()
                 }
-
+                
                 dsSectionHeader(icon: "info.circle", title: "About")
-
+                
                 dsCard {
                     HStack {
                         Text("Version")
@@ -150,9 +153,9 @@ struct SettingsTabView: View {
                             .font(.system(size: 13))
                             .foregroundStyle(Color.white.opacity(0.55))
                     }
-
+                    
                     dsDivider()
-
+                    
                     HStack(spacing: 10) {
                         dsCardButton(icon: "arrow.up.right.square", label: "View on GitHub") {
                             if let url = URL(string: "https://github.com/kartikk-k/Mac-Native-Speech-to-Text") {
@@ -161,7 +164,7 @@ struct SettingsTabView: View {
                         }
                     }
                 }
-
+                
                 // Footer
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
@@ -183,7 +186,7 @@ struct SettingsTabView: View {
             .padding(.bottom, 48)
         }
     }
-
+    
     private func settingsPermissionRow(icon: String, title: String, granted: Bool, action: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
