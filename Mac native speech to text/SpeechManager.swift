@@ -214,25 +214,9 @@ class SpeechSession: @unchecked Sendable {
     }
 }
 
-/// Manages permissions and spawns independent SpeechSessions.
+/// Spawns independent SpeechSessions.
 class SpeechManager: @unchecked Sendable {
-    var micAuthorized = false
-
-    init() {
-        SFSpeechRecognizer.requestAuthorization { status in
-            print("[SpeechManager] speech auth: \(status.rawValue)")
-        }
-        AVCaptureDevice.requestAccess(for: .audio) { granted in
-            self.micAuthorized = granted
-            print("[SpeechManager] mic access: \(granted)")
-        }
-    }
-
     func createSession(onResult: @escaping (String, Bool) -> Void) -> SpeechSession? {
-        guard micAuthorized else {
-            print("[SpeechManager] ERROR: no mic access")
-            return nil
-        }
         return SpeechSession(onResult: onResult)
     }
 }

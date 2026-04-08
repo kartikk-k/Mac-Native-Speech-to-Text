@@ -92,6 +92,18 @@ struct OverlayView: View {
                 LoadingSpinner(size: 14, lineWidth: 2)
                     .padding(.trailing, 4)
                     .opacity(0.6)
+            } else if appState.phase == .permissionDenied {
+                Button(action: {
+                    appState.onShowOnboarding?()
+                    appState.phase = .hidden
+                    appState.onHide?()
+                }) {
+                    Text("Permissions required")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.trailing, 6)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 6)
@@ -155,4 +167,11 @@ private class PreviewAppState: AppState {
     LoadingSpinner(size: 24, lineWidth: 2.5)
         .padding(40)
         .background(Color.black)
+}
+
+#Preview("Permission") {
+    OverlayView()
+        .environmentObject(PreviewAppState(phase: .permissionDenied) as AppState)
+        .padding(40)
+        .background(Color.gray.opacity(0.3))
 }

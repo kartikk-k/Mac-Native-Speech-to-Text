@@ -13,6 +13,7 @@ enum RecognitionPhase {
     case hidden
     case listening
     case processing
+    case permissionDenied
 }
 
 class AppState: ObservableObject {
@@ -23,8 +24,15 @@ class AppState: ObservableObject {
     private var currentSession: SpeechSession?
 
     var onHide: (() -> Void)?
+    var onShowOnboarding: (() -> Void)?
+    var permissionManager: PermissionManager?
 
     func startListening() {
+        if let pm = permissionManager, !pm.allPermissionsGranted {
+            phase = .permissionDenied
+            return
+        }
+
         if let old = currentSession {
             if old.isRecording { old.cancel() }
         }

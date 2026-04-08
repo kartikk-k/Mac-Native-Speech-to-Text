@@ -10,21 +10,23 @@ import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     let appState = AppState()
+    let permissionManager = PermissionManager()
     private var hotkeyMonitor: HotkeyMonitor?
     private var overlayController: OverlayWindowController?
+    private var onboardingController: OnboardingWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let trusted = AXIsProcessTrusted()
-        print("[AppDelegate] Accessibility: \(trusted)")
-        if !trusted {
-            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-            AXIsProcessTrustedWithOptions(options)
-        }
+        appState.permissionManager = permissionManager
 
         overlayController = OverlayWindowController(appState: appState)
+        onboardingController = OnboardingWindowController(permissionManager: permissionManager)
 
         appState.onHide = { [weak self] in
             self?.overlayController?.hideImmediately()
+        }
+
+        appState.onShowOnboarding = { [weak self] in
+            self?.showOnboarding()
         }
 
         hotkeyMonitor = HotkeyMonitor(
@@ -33,10 +35,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.overlayController?.show()
             },
             onHotkeyUp: { [weak self] in
-                self?.appState.stopListening()
+                guard let self = self else { return }
+                if self.appState.phase == .permissionDenied {
+                    self.overlayController?.hideAfterDelay()
+                } else {
+                    self.appState.stopListening()
+                }
             }
         )
         hotkeyMonitor?.start()
+
+        // Show onboarding if permissions are missing
+        if !permissionManager.allPermissionsGranted {
+            showOnboarding()
+        }
+    }
+
+    func showOnboarding() {
+        onboardingController?.show()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

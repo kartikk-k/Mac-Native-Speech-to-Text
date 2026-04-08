@@ -6,9 +6,11 @@
 //
 
 import SwiftUI
+import ServiceManagement
 
 struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -19,12 +21,32 @@ struct MenuBarView: View {
             case .processing:
                 Text("Processing...")
                     .font(.headline)
-            case .hidden:
+            case .hidden, .permissionDenied:
                 Text("Hold ⌃⌥ (Ctrl+Option) to dictate")
                     .font(.body)
             }
         }
         .padding(8)
+
+        Divider()
+
+        Toggle("Launch at Login", isOn: $launchAtLogin)
+            .onChange(of: launchAtLogin) { _, newValue in
+                do {
+                    if newValue {
+                        try SMAppService.mainApp.register()
+                    } else {
+                        try SMAppService.mainApp.unregister()
+                    }
+                } catch {
+                    print("[MenuBar] Launch at login error: \(error)")
+                    launchAtLogin = SMAppService.mainApp.status == .enabled
+                }
+            }
+
+        Button("Setup Permissions...") {
+            appState.onShowOnboarding?()
+        }
 
         Divider()
 
