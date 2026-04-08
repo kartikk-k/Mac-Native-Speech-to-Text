@@ -9,61 +9,74 @@ import SwiftUI
 
 struct OverlayView: View {
     @EnvironmentObject var appState: AppState
+    @State private var dotPhase: CGFloat = 0
 
     var body: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                // Pulsing ring when listening
-                if appState.isListening {
-                    Circle()
-                        .stroke(Color.blue.opacity(0.3), lineWidth: 3)
-                        .frame(width: 44, height: 44)
-                        .scaleEffect(appState.isListening ? 1.4 : 1.0)
-                        .opacity(appState.isListening ? 0 : 1)
+        HStack(spacing: 10) {
+            // Cancel button
+            Button(action: {
+                appState.cancelListening()
+            }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white.opacity(0.7))
+                    .frame(width: 22, height: 22)
+                    .background(Circle().fill(Color.white.opacity(0.15)))
+            }
+            .buttonStyle(.plain)
+
+            // Waveform dots
+            HStack(spacing: 3) {
+                ForEach(0..<7, id: \.self) { i in
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Color.white.opacity(0.8))
+                        .frame(width: 3, height: dotHeight(for: i))
                         .animation(
-                            .easeOut(duration: 1.0).repeatForever(autoreverses: false),
-                            value: appState.isListening
+                            .easeInOut(duration: 0.4)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(i) * 0.08),
+                            value: dotPhase
                         )
                 }
-
-                Circle()
-                    .fill(appState.isListening ? Color.blue : Color.green)
-                    .frame(width: 36, height: 36)
-
-                Image(systemName: appState.isListening ? "mic.fill" : "checkmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
             }
+            .frame(height: 16)
 
-            Text(statusText)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 240)
+            // Stop button
+            Button(action: {
+                appState.stopListening()
+            }) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.red)
+                    .frame(width: 12, height: 12)
+                    .padding(5)
+                    .background(Circle().fill(Color.white.opacity(0.15)))
+            }
+            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .environment(\.colorScheme, .dark)
+            Capsule()
+                .fill(Color.black.opacity(0.85))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            Capsule()
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
+        .onAppear {
+            dotPhase = 1
+        }
+        .onChange(of: appState.isListening) { _, newValue in
+            dotPhase = newValue ? 1 : 0
+        }
     }
 
-    private var statusText: String {
-        if appState.isListening {
-            return appState.transcribedText.isEmpty
-                ? "Listening..."
-                : appState.transcribedText
-        } else {
-            return appState.lastTranscription.isEmpty
-                ? "Done"
-                : "Copied!"
-        }
+    private func dotHeight(for index: Int) -> CGFloat {
+        guard appState.isListening else { return 3 }
+        let base: CGFloat = 4
+        let amplitude: CGFloat = 10
+        // Staggered heights for wave effect
+        let offsets: [CGFloat] = [0.3, 0.7, 1.0, 0.8, 1.0, 0.6, 0.4]
+        return base + amplitude * offsets[index] * dotPhase
     }
 }

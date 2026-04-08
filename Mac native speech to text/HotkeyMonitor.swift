@@ -26,12 +26,14 @@ class HotkeyMonitor {
         flagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             self?.handleFlagsChanged(event)
         }
+        print("[HotkeyMonitor] started — listening for Ctrl+Option")
     }
 
     func stop() {
         if let monitor = flagsMonitor {
             NSEvent.removeMonitor(monitor)
             flagsMonitor = nil
+            print("[HotkeyMonitor] stopped")
         }
     }
 
@@ -41,11 +43,13 @@ class HotkeyMonitor {
 
         if bothHeld && !isHotkeyHeld {
             isHotkeyHeld = true
+            print("[HotkeyMonitor] >>> HOTKEY DOWN (Ctrl+Option pressed)")
             DispatchQueue.main.async { [weak self] in
                 self?.onHotkeyDown()
             }
         } else if !bothHeld && isHotkeyHeld {
             isHotkeyHeld = false
+            print("[HotkeyMonitor] <<< HOTKEY UP (Ctrl+Option released)")
             DispatchQueue.main.async { [weak self] in
                 self?.onHotkeyUp()
             }
