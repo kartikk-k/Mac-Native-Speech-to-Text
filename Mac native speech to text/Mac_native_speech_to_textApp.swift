@@ -9,9 +9,14 @@ import SwiftUI
 
 @main
 struct Mac_native_speech_to_textApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        MenuBarExtra {
+            MenuBarView()
+                .environmentObject(appDelegate.appState)
+        } label: {
+            Image(systemName: appDelegate.appState.isListening ? "mic.fill" : "mic")
         }
     }
 }
