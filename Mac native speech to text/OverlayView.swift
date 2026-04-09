@@ -42,7 +42,17 @@ struct LoadingSpinner: View {
 
 struct OverlayView: View {
     @EnvironmentObject var appState: AppState
-    @State private var dotPhase: CGFloat = 0
+
+    var body: some View {
+        let monitor = appState.audioLevelMonitor
+        WaveformContent(appState: appState, monitor: monitor)
+    }
+}
+
+/// Inner view that observes the AudioLevelMonitor for real-time updates.
+private struct WaveformContent: View {
+    @ObservedObject var appState: AppState
+    @ObservedObject var monitor: AudioLevelMonitor
 
     var body: some View {
         HStack(spacing: 10) {
@@ -60,21 +70,16 @@ struct OverlayView: View {
 
             // Center content
             if appState.phase == .listening {
-                // Waveform bars
+                // Waveform bars driven by real audio levels
                 HStack(spacing: 3) {
                     ForEach(0..<7, id: \.self) { i in
                         RoundedRectangle(cornerRadius: 1.5)
                             .fill(Color.white.opacity(0.8))
-                            .frame(width: 2, height: dotHeight(for: i))
-                            .animation(
-                                .easeInOut(duration: 0.4)
-                                    .repeatForever(autoreverses: true)
-                                    .delay(Double(i) * 0.08),
-                                value: dotPhase
-                            )
+                            .frame(width: 2, height: barHeight(for: i))
+                            .animation(.easeOut(duration: 0.08), value: monitor.levels[i])
                     }
                 }
-                .frame(height: 16)
+                .frame(height: 22)
 
                 // Stop button
                 Button(action: {
@@ -118,25 +123,13 @@ struct OverlayView: View {
         )
         .animation(.easeInOut(duration: 0.2), value: appState.phase)
         .frame(maxWidth: .infinity)
-        .onAppear {
-            dotPhase = 1
-        }
-        .onChange(of: appState.phase) { _, newPhase in
-            if newPhase == .listening {
-                dotPhase = 0
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    dotPhase = 1
-                }
-            }
-        }
     }
 
-    private func dotHeight(for index: Int) -> CGFloat {
-        guard appState.phase == .listening else { return 3 }
+    private func barHeight(for index: Int) -> CGFloat {
         let base: CGFloat = 4
-        let amplitude: CGFloat = 10
-        let offsets: [CGFloat] = [0.3, 0.7, 1.0, 0.8, 1.0, 0.6, 0.4]
-        return base + amplitude * offsets[index] * dotPhase
+        let maxHeight: CGFloat = 20
+        let level = monitor.levels[index]
+        return base + (maxHeight - base) * level
     }
 }
 

@@ -25,11 +25,13 @@ class SpeechSession: @unchecked Sendable {
 
     private var recordingStartTime: CFAbsoluteTime = 0
     private let onResult: (String, Bool) -> Void
+    private weak var audioLevelMonitor: AudioLevelMonitor?
 
     var isRecording = false
 
-    init(onResult: @escaping (String, Bool) -> Void) {
+    init(onResult: @escaping (String, Bool) -> Void, audioLevelMonitor: AudioLevelMonitor? = nil) {
         self.onResult = onResult
+        self.audioLevelMonitor = audioLevelMonitor
         self.speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     }
 
@@ -65,6 +67,7 @@ class SpeechSession: @unchecked Sendable {
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
             try? self?.audioFile?.write(from: buffer)
+            self?.audioLevelMonitor?.process(buffer: buffer)
         }
 
         engine.prepare()
@@ -217,7 +220,7 @@ class SpeechSession: @unchecked Sendable {
 
 /// Spawns independent SpeechSessions.
 class SpeechManager: @unchecked Sendable {
-    func createSession(onResult: @escaping (String, Bool) -> Void) -> SpeechSession? {
-        return SpeechSession(onResult: onResult)
+    func createSession(onResult: @escaping (String, Bool) -> Void, audioLevelMonitor: AudioLevelMonitor? = nil) -> SpeechSession? {
+        return SpeechSession(onResult: onResult, audioLevelMonitor: audioLevelMonitor)
     }
 }

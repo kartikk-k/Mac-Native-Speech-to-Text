@@ -20,6 +20,7 @@ class AppState: ObservableObject {
     @Published var phase: RecognitionPhase = .hidden
     @Published var transcribedText = ""
 
+    let audioLevelMonitor = AudioLevelMonitor()
     private let speechManager = SpeechManager()
     private var currentSession: SpeechSession?
 
@@ -58,8 +59,9 @@ class AppState: ObservableObject {
         transcribedText = ""
         recordingStartTime = CFAbsoluteTimeGetCurrent()
         VolumeManager.shared.muteSystem()
+        audioLevelMonitor.reset()
 
-        let session = speechManager.createSession { [weak self] text, isFinal in
+        let session = speechManager.createSession(onResult: { [weak self] text, isFinal in
             DispatchQueue.main.async {
                 guard let self = self else { return }
 
@@ -83,7 +85,7 @@ class AppState: ObservableObject {
                     self.onHide?()
                 }
             }
-        }
+        }, audioLevelMonitor: audioLevelMonitor)
 
         guard let session = session else {
             phase = .hidden
@@ -98,6 +100,7 @@ class AppState: ObservableObject {
         guard phase == .listening, let session = currentSession else { return }
         print("[AppState] === STOP → PROCESSING ===")
         phase = .processing
+        audioLevelMonitor.reset()
         session.stopAndTranscribe()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) { [weak self] in
@@ -117,6 +120,7 @@ class AppState: ObservableObject {
         print("[AppState] === CANCEL ===")
         currentSession?.cancel()
         currentSession = nil
+        audioLevelMonitor.reset()
         VolumeManager.shared.restoreSystem()
         phase = .hidden
         transcribedText = ""
