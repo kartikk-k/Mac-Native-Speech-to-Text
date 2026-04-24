@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "2D2A64102F86037F00B4E38E"
-               BuildableName = "Mac native speech to text.app"
-               BlueprintName = "Mac native speech to text"
-               ReferencedContainer = "container:Mac native speech to text.xcodeproj">
+               BuildableName = " Echotype Mac.app"
+               BlueprintName = " Echotype Mac"
+               ReferencedContainer = "container: Echotype Mac.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -46,9 +46,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "2D2A64102F86037F00B4E38E"
-            BuildableName = "Mac native speech to text.app"
-            BlueprintName = "Mac native speech to text"
-            ReferencedContainer = "container:Mac native speech to text.xcodeproj">
+            BuildableName = " Echotype Mac.app"
+            BlueprintName = " Echotype Mac"
+            ReferencedContainer = "container: Echotype Mac.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -63,9 +63,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "2D2A64102F86037F00B4E38E"
-            BuildableName = "Mac native speech to text.app"
-            BlueprintName = "Mac native speech to text"
-            ReferencedContainer = "container:Mac native speech to text.xcodeproj">
+            BuildableName = " Echotype Mac.app"
+            BlueprintName = " Echotype Mac"
+            ReferencedContainer = "container: Echotype Mac.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

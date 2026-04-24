@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		2D2A64112F86037F00B4E38E /* Mac native speech to text.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Mac native speech to text.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D2A64112F86037F00B4E38E /*  Echotype Mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = " Echotype Mac.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -40,7 +40,7 @@
 		2D2A64122F86037F00B4E38E /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				2D2A64112F86037F00B4E38E /* Mac native speech to text.app */,
+				2D2A64112F86037F00B4E38E /*  Echotype Mac.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,9 +48,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		2D2A64102F86037F00B4E38E /* Mac native speech to text */ = {
+		2D2A64102F86037F00B4E38E /*  Echotype Mac */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2D2A641C2F86038000B4E38E /* Build configuration list for PBXNativeTarget "Mac native speech to text" */;
+			buildConfigurationList = 2D2A641C2F86038000B4E38E /* Build configuration list for PBXNativeTarget " Echotype Mac" */;
 			buildPhases = (
 				2D2A640D2F86037F00B4E38E /* Sources */,
 				2D2A640E2F86037F00B4E38E /* Frameworks */,
@@ -63,11 +63,11 @@
 			fileSystemSynchronizedGroups = (
 				2D2A64132F86037F00B4E38E /* Mac native speech to text */,
 			);
-			name = "Mac native speech to text";
+			name = " Echotype Mac";
 			packageProductDependencies = (
 			);
 			productName = "Mac native speech to text";
-			productReference = 2D2A64112F86037F00B4E38E /* Mac native speech to text.app */;
+			productReference = 2D2A64112F86037F00B4E38E /*  Echotype Mac.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -85,7 +85,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 2D2A640C2F86037F00B4E38E /* Build configuration list for PBXProject "Mac native speech to text" */;
+			buildConfigurationList = 2D2A640C2F86037F00B4E38E /* Build configuration list for PBXProject " Echotype Mac" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -99,7 +99,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				2D2A64102F86037F00B4E38E /* Mac native speech to text */,
+				2D2A64102F86037F00B4E38E /*  Echotype Mac */,
 			);
 		};
 /* End PBXProject section */
@@ -318,7 +318,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2D2A640C2F86037F00B4E38E /* Build configuration list for PBXProject "Mac native speech to text" */ = {
+		2D2A640C2F86037F00B4E38E /* Build configuration list for PBXProject " Echotype Mac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2D2A641A2F86038000B4E38E /* Debug */,
@@ -327,7 +327,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2D2A641C2F86038000B4E38E /* Build configuration list for PBXNativeTarget "Mac native speech to text" */ = {
+		2D2A641C2F86038000B4E38E /* Build configuration list for PBXNativeTarget " Echotype Mac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2D2A641D2F86038000B4E38E /* Debug */,
