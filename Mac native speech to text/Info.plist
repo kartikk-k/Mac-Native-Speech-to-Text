@@ -4,6 +4,10 @@
 <dict>
 	<key>LSUIElement</key>
 	<true/>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/kartikk-k/Echotype-Mac/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>B625Kw5HhyNAVHNHe2T1u8M+/jYWWWr9vp12thkaMM4=</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>This app uses speech recognition to convert your voice into text.</string>
 	<key>NSMicrophoneUsageDescription</key>

@@ -13,6 +13,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let permissionManager = PermissionManager()
     let usageTracker = UsageTracker()
     let snippetManager = SnippetManager()
+    let updaterManager = UpdaterManager()
     private var hotkeyMonitor: HotkeyMonitor?
     private var overlayController: OverlayWindowController?
     private var onboardingController: OnboardingWindowController?
@@ -25,7 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         overlayController = OverlayWindowController(appState: appState)
         onboardingController = OnboardingWindowController(permissionManager: permissionManager)
-        mainWindowController = MainWindowController(usageTracker: usageTracker, permissionManager: permissionManager, snippetManager: snippetManager, appState: appState)
+        mainWindowController = MainWindowController(usageTracker: usageTracker, permissionManager: permissionManager, snippetManager: snippetManager, appState: appState, updaterManager: updaterManager)
 
         appState.onHide = { [weak self] in
             self?.hotkeyMonitor?.isHandsFree = false

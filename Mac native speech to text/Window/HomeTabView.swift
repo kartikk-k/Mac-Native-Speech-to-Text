@@ -95,7 +95,7 @@ struct HomeTabView: View {
                         Image(systemName: "mic.circle.fill")
                             .font(.system(size: 14))
                             .foregroundStyle(Color.white.opacity(0.25))
-                        Text("Mac Native Speech to Text - v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
+                        Text("Echotype Mac - v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
                             .font(.system(size: 12))
                             .foregroundStyle(Color.white.opacity(0.30))
                     }

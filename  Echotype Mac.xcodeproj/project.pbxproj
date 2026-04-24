@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		2DC3DC382F9B8FC10029E15C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2D2A65002F86040000B4E38E /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		2D2A64112F86037F00B4E38E /*  Echotype Mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = " Echotype Mac.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2DC3DC382F9B8FC10029E15C /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = " Echotype Mac";
 			packageProductDependencies = (
+				2D2A65002F86040000B4E38E /* Sparkle */,
 			);
 			productName = "Mac native speech to text";
 			productReference = 2D2A64112F86037F00B4E38E /*  Echotype Mac.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = 2D2A64082F86037F00B4E38E;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				2D2A64FF2F86040000B4E38E /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2D2A64122F86037F00B4E38E /* Products */;
 			projectDirPath = "";
@@ -251,7 +260,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Mac native speech to text/Mac_native_speech_to_text.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = HXV2NNGP22;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -287,7 +296,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Mac native speech to text/Mac_native_speech_to_text.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = HXV2NNGP22;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -337,6 +346,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		2D2A64FF2F86040000B4E38E /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2D2A65002F86040000B4E38E /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2D2A64FF2F86040000B4E38E /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2D2A64092F86037F00B4E38E /* Project object */;
 }

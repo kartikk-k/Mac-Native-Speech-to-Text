@@ -30,7 +30,9 @@ class PermissionManager {
     func checkAll() {
         microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         speechRecognitionGranted = SFSpeechRecognizer.authorizationStatus() == .authorized
-        accessibilityGranted = AXIsProcessTrusted()
+        // Use kAXTrustedCheckOptionPrompt=false to query without prompting
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
+        accessibilityGranted = AXIsProcessTrustedWithOptions(options)
     }
 
     func requestMicrophone() {
@@ -61,14 +63,17 @@ class PermissionManager {
 
     func requestAccessibility() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        AXIsProcessTrustedWithOptions(options)
+        accessibilityGranted = AXIsProcessTrustedWithOptions(options)
+        startPollingAccessibility()
     }
 
     func startPollingAccessibility() {
         stopPollingAccessibility()
         accessibilityTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
+            let trusted = AXIsProcessTrustedWithOptions(options)
             DispatchQueue.main.async {
-                self?.accessibilityGranted = AXIsProcessTrusted()
+                self?.accessibilityGranted = trusted
             }
         }
     }

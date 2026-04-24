@@ -7,9 +7,11 @@
 
 import SwiftUI
 import ServiceManagement
+import Sparkle
 
 struct SettingsTabView: View {
     @Environment(PermissionManager.self) private var permissionManager
+    var updaterManager: UpdaterManager?
     @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
     @State private var showIndicator: Bool = UserDefaults.standard.object(forKey: "setting_showIndicator") as? Bool ?? true
     @State private var onDeviceOnly: Bool = UserDefaults.standard.object(forKey: "setting_onDeviceOnly") as? Bool ?? true
@@ -153,12 +155,31 @@ struct SettingsTabView: View {
                             .font(.system(size: 13))
                             .foregroundStyle(Color.white.opacity(0.55))
                     }
-                    
+
                     dsDivider()
-                    
+
+                    HStack {
+                        Text("Check for updates automatically")
+                            .font(.system(size: 13.5))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { updaterManager?.automaticallyChecksForUpdates ?? true },
+                            set: { updaterManager?.automaticallyChecksForUpdates = $0 }
+                        ))
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                    }
+
+                    dsDivider()
+
                     HStack(spacing: 10) {
+                        dsCardButton(icon: "arrow.triangle.2.circlepath", label: "Check for Updates") {
+                            updaterManager?.checkForUpdates()
+                        }
+
                         dsCardButton(icon: "arrow.up.right.square", label: "View on GitHub") {
-                            if let url = URL(string: "https://github.com/kartikk-k/Mac-Native-Speech-to-Text") {
+                            if let url = URL(string: "https://github.com/kartikk-k/Echotype-Mac") {
                                 NSWorkspace.shared.open(url)
                             }
                         }
@@ -171,7 +192,7 @@ struct SettingsTabView: View {
                         Image(systemName: "mic.circle.fill")
                             .font(.system(size: 14))
                             .foregroundStyle(Color.white.opacity(0.25))
-                        Text("Mac Native Speech to Text - v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
+                        Text("Echotype Mac - v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
                             .font(.system(size: 12))
                             .foregroundStyle(Color.white.opacity(0.30))
                     }

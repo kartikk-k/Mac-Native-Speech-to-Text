@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct InviteTabView: View {
-    private let githubURL = "https://github.com/kartikk-k/Mac-Native-Speech-to-Text"
+    private let githubURL = "https://github.com/kartikk-k/Echotype-Mac"
 
     @State private var copied = false
 
@@ -30,7 +30,7 @@ struct InviteTabView: View {
                                 .foregroundStyle(Color.white.opacity(0.5))
                                 .frame(width: 20)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Share Mac Native Speech to Text")
+                                Text("Share Echotype")
                                     .font(.system(size: 13.5, weight: .medium))
                                     .foregroundStyle(.white)
                                 Text("This app is free and open source. Share it with friends who could use better dictation on their Mac.")
@@ -82,7 +82,7 @@ struct InviteTabView: View {
                             if let url = URL(string: githubURL) {
                                 let service = NSSharingService(named: .composeMessage)
                                 service?.perform(withItems: [
-                                    "Check out Mac Native Speech to Text — a free, open-source dictation app for macOS!" as NSString,
+                                    "Check out Echotype — a free, open-source dictation app for macOS!" as NSString,
                                     url as NSURL
                                 ])
                             }

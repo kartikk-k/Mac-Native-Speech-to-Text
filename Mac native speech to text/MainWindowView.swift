@@ -33,6 +33,7 @@ enum MainTab: String, CaseIterable {
 
 struct MainWindowView: View {
     @Environment(PermissionManager.self) private var permissionManager
+    var updaterManager: UpdaterManager?
     @State private var selectedTab: MainTab = .home
 
     var body: some View {
@@ -52,7 +53,7 @@ struct MainWindowView: View {
                         case .stats:
                             StatsTabView()
                         case .settings:
-                            SettingsTabView()
+                            SettingsTabView(updaterManager: updaterManager)
                         case .invite:
                             InviteTabView()
                         }
@@ -81,7 +82,7 @@ struct PermissionSetupView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(.blue)
 
-                Text("Mac Native Speech to Text")
+                Text("Echotype")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.white)
 

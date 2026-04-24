@@ -19,7 +19,7 @@ struct OnboardingView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(.blue)
 
-                Text("Mac Native Speech to Text")
+                Text("Echotype")
                     .font(.system(size: 20, weight: .semibold))
 
                 Text("Grant the following permissions to get started.")

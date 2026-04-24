@@ -44,7 +44,7 @@ class OnboardingWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Mac Native Speech to Text"
+        window.title = "Echotype"
         window.contentView = hostingView
         window.center()
         window.isReleasedWhenClosed = false
