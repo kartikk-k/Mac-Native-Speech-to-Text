@@ -75,7 +75,7 @@ for release in releases:
         type=\"application/octet-stream\"
         sparkle:os=\"macos\" />
     </item>''')
-"
+" >> "$APPCAST_FILE"
 
 cat >> "$APPCAST_FILE" << 'FOOTER'
   </channel>

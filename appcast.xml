@@ -5,5 +5,16 @@
     <link>https://github.com/kartikk-k/Echotype-Mac</link>
     <description>Echotype Mac updates</description>
     <language>en</language>
+    <item>
+      <title>Echotype Mac v1.0</title>
+      <pubDate>2026-04-24T12:44:53Z</pubDate>
+      <sparkle:version>1.0</sparkle:version>
+      <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
+      <enclosure
+        url="https://github.com/kartikk-k/Echotype-Mac/releases/download/v1.0/Echotype.Mac.dmg"
+        length="2644112"
+        type="application/octet-stream"
+        sparkle:os="macos" />
+    </item>
   </channel>
 </rss>
