@@ -31,8 +31,8 @@ class AppState: ObservableObject {
     @Published var lastEndReason: SessionEndReason = .none
 
     let audioLevelMonitor = AudioLevelMonitor()
-    private let speechManager = SpeechManager()
-    private var currentSession: SpeechSession?
+    let speechManager = SpeechManager()
+    private var currentSession: TranscriptionSession?
 
     var onHide: (() -> Void)?
     var onShowOnboarding: (() -> Void)?

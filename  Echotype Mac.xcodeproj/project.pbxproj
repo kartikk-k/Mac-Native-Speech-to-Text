@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2DC3DC382F9B8FC10029E15C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2D2A65002F86040000B4E38E /* Sparkle */; };
+		2DC3DC392F9B8FC10029E15D /* onnxruntime-objc in Frameworks */ = {isa = PBXBuildFile; productRef = 2D2A65012F86040000B4E38F /* onnxruntime-objc */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2DC3DC382F9B8FC10029E15C /* Sparkle in Frameworks */,
+				2DC3DC392F9B8FC10029E15D /* onnxruntime-objc in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = " Echotype Mac";
 			packageProductDependencies = (
 				2D2A65002F86040000B4E38E /* Sparkle */,
+				2D2A65012F86040000B4E38F /* onnxruntime-objc */,
 			);
 			productName = "Mac native speech to text";
 			productReference = 2D2A64112F86037F00B4E38E /*  Echotype Mac.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				2D2A64FF2F86040000B4E38E /* XCRemoteSwiftPackageReference "Sparkle" */,
+				2D2A65022F86040000B4E390 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2D2A64122F86037F00B4E38E /* Products */;
@@ -356,6 +360,14 @@
 				minimumVersion = 2.6.0;
 			};
 		};
+		2D2A65022F86040000B4E390 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/microsoft/onnxruntime-swift-package-manager";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.18.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -363,6 +375,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2D2A64FF2F86040000B4E38E /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		2D2A65012F86040000B4E38F /* onnxruntime-objc */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2D2A65022F86040000B4E390 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */;
+			productName = "onnxruntime-objc";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
