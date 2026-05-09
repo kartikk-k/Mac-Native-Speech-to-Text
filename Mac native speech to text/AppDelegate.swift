@@ -66,6 +66,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         hotkeyMonitor?.start()
 
+        // Reload the active provider when the user changes engine or model install state.
+        NotificationCenter.default.addObserver(
+            forName: SpeechManager.providerChangedNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.appState.speechManager.reset()
+        }
+
         // Show main window on launch (permission setup is embedded in the main window)
         showMainWindow()
     }
