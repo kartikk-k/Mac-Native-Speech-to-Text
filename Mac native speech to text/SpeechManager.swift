@@ -10,7 +10,7 @@ import Speech
 import AVFoundation
 
 /// A single recording+transcription session. Fully independent — multiple can exist.
-class SpeechSession: @unchecked Sendable {
+class SpeechSession: TranscriptionSession, @unchecked Sendable {
     let id = UUID()
     private let speechRecognizer: SFSpeechRecognizer?
     private var audioEngine: AVAudioEngine?
@@ -218,9 +218,26 @@ class SpeechSession: @unchecked Sendable {
     }
 }
 
-/// Spawns independent SpeechSessions.
+/// Spawns independent transcription sessions, choosing the engine from settings.
 class SpeechManager: @unchecked Sendable {
-    func createSession(onResult: @escaping (String, Bool) -> Void, audioLevelMonitor: AudioLevelMonitor? = nil) -> SpeechSession? {
+    /// - Parameters:
+    ///   - onResult: interim/final transcript callback.
+    ///   - onFailure: called with a saved WAV + reason when a capture couldn't
+    ///     be transcribed (used by the GPT Realtime engine for retry).
+    func createSession(onResult: @escaping (String, Bool) -> Void,
+                       onFailure: @escaping (URL, String) -> Void,
+                       audioLevelMonitor: AudioLevelMonitor? = nil) -> TranscriptionSession? {
+        // Use GPT Realtime only when it's selected AND a key is present;
+        // otherwise fall back to the built-in on-device recognizer.
+        if TranscriptionSettings.usesGPTRealtime, let apiKey = TranscriptionSettings.openAIApiKey {
+            return GPTRealtimeSession(
+                apiKey: apiKey,
+                model: TranscriptionSettings.model,
+                onResult: onResult,
+                onFailure: onFailure,
+                audioLevelMonitor: audioLevelMonitor
+            )
+        }
         return SpeechSession(onResult: onResult, audioLevelMonitor: audioLevelMonitor)
     }
 }

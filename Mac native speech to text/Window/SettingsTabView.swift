@@ -16,6 +16,9 @@ struct SettingsTabView: View {
     @State private var showIndicator: Bool = UserDefaults.standard.object(forKey: "setting_showIndicator") as? Bool ?? true
     @State private var onDeviceOnly: Bool = UserDefaults.standard.object(forKey: "setting_onDeviceOnly") as? Bool ?? true
     @State private var selectedLanguage: String = "en-US"
+    @State private var transcriptionProvider: TranscriptionProvider = TranscriptionSettings.provider
+    @State private var openAIKeyInput: String = TranscriptionSettings.openAIApiKey ?? ""
+    @State private var openAIKeySaved: Bool = TranscriptionSettings.hasOpenAIKey
     
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -55,8 +58,77 @@ struct SettingsTabView: View {
                     }
                 }
                 
+                dsSectionHeader(icon: "waveform.circle", title: "Transcription Engine")
+
+                dsCard {
+                    dsPickerRow(
+                        title: "Engine",
+                        value: transcriptionProvider.displayName,
+                        options: TranscriptionProvider.allCases.map { $0.displayName }
+                    ) { selected in
+                        if let picked = TranscriptionProvider.allCases.first(where: { $0.displayName == selected }) {
+                            transcriptionProvider = picked
+                            TranscriptionSettings.provider = picked
+                        }
+                    }
+
+                    if transcriptionProvider == .native {
+                        Text("Uses Apple's built-in, on-device recognition. Fully private, works offline.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.white.opacity(0.40))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        dsDivider()
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("OpenAI API Key")
+                                    .font(.system(size: 13.5))
+                                    .foregroundStyle(.white)
+                                Text("Streams audio to GPT Realtime (text only, no audio) for faster transcription. Stored securely in your Keychain.")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.white.opacity(0.40))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            HStack(spacing: 8) {
+                                SecureField("sk-...", text: $openAIKeyInput)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 12.5))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 7)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(Color.white.opacity(0.06))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                                            )
+                                    )
+                                    .onChange(of: openAIKeyInput) { _, _ in
+                                        openAIKeySaved = false
+                                    }
+
+                                dsCardButton(icon: openAIKeySaved ? "checkmark" : "square.and.arrow.down",
+                                             label: openAIKeySaved ? "Saved" : "Save") {
+                                    TranscriptionSettings.openAIApiKey = openAIKeyInput
+                                    openAIKeySaved = TranscriptionSettings.hasOpenAIKey
+                                }
+                            }
+
+                            if !openAIKeySaved && !TranscriptionSettings.hasOpenAIKey {
+                                Text("No key saved — the built-in engine is used until you add one.")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.orange.opacity(0.75))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    }
+                }
+
                 dsSectionHeader(icon: "mic.fill", title: "Recognition")
-                
+
                 dsCard {
                     //                    dsToggleRow(
                     //                        icon: "waveform",

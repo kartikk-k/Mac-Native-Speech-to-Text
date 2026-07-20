@@ -14,6 +14,7 @@ enum MainTab: String, CaseIterable {
     case learn = "Learn"
     case snippets = "Snippets"
     case stats = "Stats"
+    case retry = "Retry"
     case settings = "Settings"
     case invite = "Invite"
 
@@ -23,6 +24,7 @@ enum MainTab: String, CaseIterable {
         case .learn: return "graduationcap.fill"
         case .snippets: return "text.quote"
         case .stats: return "chart.bar.xaxis.ascending"
+        case .retry: return "exclamationmark.arrow.circlepath"
         case .settings: return "gearshape.fill"
         case .invite: return "person.badge.plus"
         }
@@ -33,6 +35,7 @@ enum MainTab: String, CaseIterable {
 
 struct MainWindowView: View {
     @Environment(PermissionManager.self) private var permissionManager
+    @EnvironmentObject private var appState: AppState
     var updaterManager: UpdaterManager?
     @State private var selectedTab: MainTab = .home
 
@@ -52,6 +55,8 @@ struct MainWindowView: View {
                             SnippetsTabView()
                         case .stats:
                             StatsTabView()
+                        case .retry:
+                            RetryTabView()
                         case .settings:
                             SettingsTabView(updaterManager: updaterManager)
                         case .invite:
@@ -65,6 +70,18 @@ struct MainWindowView: View {
             }
         }
         .frame(minWidth: 800, minHeight: 500)
+        .onAppear {
+            if let requested = appState.requestedTab {
+                selectedTab = requested
+                appState.requestedTab = nil
+            }
+        }
+        .onChange(of: appState.requestedTab) { _, newValue in
+            if let requested = newValue {
+                selectedTab = requested
+                appState.requestedTab = nil
+            }
+        }
     }
 }
 
@@ -187,4 +204,6 @@ struct PermissionSetupView: View {
 #Preview {
     MainWindowView()
         .environment(PermissionManager())
+        .environmentObject(AppState())
+        .environmentObject(FailedTranscriptionStore())
 }

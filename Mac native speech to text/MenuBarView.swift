@@ -21,6 +21,10 @@ struct MenuBarView: View {
             case .processing:
                 Text("Processing...")
                     .font(.headline)
+            case .failed:
+                Text("Transcription failed — tap the pill to retry")
+                    .font(.body)
+                    .foregroundStyle(.orange.opacity(0.8))
             case .hidden, .permissionDenied:
                 Text("Hold \(Image(systemName: "globe")) (Fn) to dictate")
                     .font(.body)

@@ -109,6 +109,47 @@ private struct WaveformContent: View {
                         .padding(.trailing, 6)
                 }
                 .buttonStyle(.plain)
+            } else if appState.phase == .failed {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.orange)
+
+                    Text("Failed")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+
+                    // Retry the saved audio in place.
+                    Button(action: {
+                        appState.retryLastFailed()
+                    }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text("Retry")
+                                .font(.system(size: 10.5, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.white.opacity(0.18)))
+                    }
+                    .buttonStyle(.plain)
+
+                    // Open the app focused on this audio for a manual retry.
+                    Button(action: {
+                        appState.openFailedInApp()
+                    }) {
+                        Text("Open")
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.85))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.white.opacity(0.10)))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.trailing, 2)
             }
         }
         .padding(.horizontal, 6)
