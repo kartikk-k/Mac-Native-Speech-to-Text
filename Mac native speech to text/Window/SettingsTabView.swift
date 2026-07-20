@@ -19,6 +19,8 @@ struct SettingsTabView: View {
     @State private var transcriptionProvider: TranscriptionProvider = TranscriptionSettings.provider
     @State private var openAIKeyInput: String = TranscriptionSettings.openAIApiKey ?? ""
     @State private var openAIKeySaved: Bool = TranscriptionSettings.hasOpenAIKey
+    @State private var fixGrammar: Bool = TranscriptionSettings.fixGrammar
+    @State private var rephrase: Bool = TranscriptionSettings.rephrase
     
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -124,6 +126,39 @@ struct SettingsTabView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
+                    }
+                }
+
+                dsSectionHeader(icon: "text.badge.checkmark", title: "Text Cleanup")
+
+                dsCard {
+                    dsToggleRow(
+                        icon: "checkmark.circle",
+                        title: "Fix grammar",
+                        subtitle: "Correct grammar and format lists as you dictate, keeping your meaning",
+                        binding: $fixGrammar
+                    )
+                    .onChange(of: fixGrammar) { _, newValue in
+                        TranscriptionSettings.fixGrammar = newValue
+                    }
+
+                    dsDivider()
+
+                    dsToggleRow(
+                        icon: "wand.and.stars",
+                        title: "Rephrase",
+                        subtitle: "Polish phrasing and flow for clearer writing (off by default)",
+                        binding: $rephrase
+                    )
+                    .onChange(of: rephrase) { _, newValue in
+                        TranscriptionSettings.rephrase = newValue
+                    }
+
+                    if (fixGrammar || rephrase) && !TranscriptionSettings.hasOpenAIKey {
+                        Text("Cleanup uses OpenAI — add an API key above to enable it. Until then, text is inserted as transcribed.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.orange.opacity(0.75))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 

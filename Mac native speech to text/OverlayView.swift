@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 // MARK: - Spinner matching the SVG: circle track (0.3 opacity) + arc (white)
 
@@ -146,6 +147,67 @@ private struct WaveformContent: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Capsule().fill(Color.white.opacity(0.10)))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.trailing, 2)
+
+            } else if appState.phase == .cleanupFailed {
+                // Raw transcript was already pasted; grammar/rephrase failed.
+                HStack(spacing: 8) {
+                    Image(systemName: appState.cleanupOutOfCredits ? "creditcard.trianglebadge.exclamationmark" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.orange)
+
+                    Text(appState.cleanupFailureReason ?? "Cleanup failed")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineLimit(1)
+
+                    if appState.cleanupOutOfCredits {
+                        // Take the user to top up their OpenAI credits.
+                        Button(action: {
+                            if let url = URL(string: "https://platform.openai.com/settings/organization/billing/overview") {
+                                NSWorkspace.shared.open(url)
+                            }
+                            appState.dismissCleanupFailure()
+                        }) {
+                            Text("Add credits")
+                                .font(.system(size: 10.5, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(Color.white.opacity(0.18)))
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        // Re-run the grammar/rephrase pass on the raw transcript.
+                        Button(action: {
+                            appState.retryCleanup()
+                        }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 9, weight: .semibold))
+                                Text("Retry")
+                                    .font(.system(size: 10.5, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.white.opacity(0.18)))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Dismiss — keep the raw text, drop the cleanup.
+                    Button(action: {
+                        appState.dismissCleanupFailure()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(5)
+                            .background(Circle().fill(Color.white.opacity(0.12)))
                     }
                     .buttonStyle(.plain)
                 }

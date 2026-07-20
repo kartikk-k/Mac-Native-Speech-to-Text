@@ -25,6 +25,10 @@ struct MenuBarView: View {
                 Text("Transcription failed — tap the pill to retry")
                     .font(.body)
                     .foregroundStyle(.orange.opacity(0.8))
+            case .cleanupFailed:
+                Text(appState.cleanupFailureReason ?? "Cleanup failed")
+                    .font(.body)
+                    .foregroundStyle(.orange.opacity(0.8))
             case .hidden, .permissionDenied:
                 Text("Hold \(Image(systemName: "globe")) (Fn) to dictate")
                     .font(.body)

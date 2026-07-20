@@ -28,6 +28,32 @@ enum TranscriptionProvider: String, CaseIterable {
 enum TranscriptionSettings {
     private static let providerKey = "setting_transcriptionProvider"
     private static let modelKey = "setting_gptRealtimeModel"
+    private static let grammarKey = "setting_fixGrammar"
+    private static let rephraseKey = "setting_rephrase"
+
+    /// Model used for the post-transcription cleanup pass (grammar/rephrase/list
+    /// formatting). Cheap and fast; only invoked when a cleanup toggle is on.
+    static let cleanupModel = "gpt-4o-mini"
+
+    /// Fix grammar while inserting (default ON). Runs a quick LLM cleanup pass
+    /// that corrects grammar and formats lists, preserving the user's meaning.
+    static var fixGrammar: Bool {
+        get { UserDefaults.standard.object(forKey: grammarKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: grammarKey) }
+    }
+
+    /// Rephrase for clarity while inserting (default OFF). When on, the cleanup
+    /// pass also polishes phrasing and flow (clean & polish, meaning preserved).
+    static var rephrase: Bool {
+        get { UserDefaults.standard.object(forKey: rephraseKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: rephraseKey) }
+    }
+
+    /// True when any cleanup toggle is on AND an OpenAI key is present (the pass
+    /// needs the API). If no key, cleanup is silently skipped.
+    static var cleanupEnabled: Bool {
+        (fixGrammar || rephrase) && hasOpenAIKey
+    }
 
     private static let keychainService = "com.peakhumanexperience.echotype.openai"
     private static let keychainAccount = "openai-api-key"
