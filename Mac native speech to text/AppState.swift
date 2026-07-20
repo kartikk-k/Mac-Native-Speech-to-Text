@@ -51,6 +51,9 @@ class AppState: ObservableObject {
     var failedStore: FailedTranscriptionStore?
 
     private var recordingStartTime: CFAbsoluteTime = 0
+    /// Identifies the in-flight processing session so a stale fallback timer
+    /// can't act on a session that already resolved (or was replaced).
+    private var processingToken: UUID?
 
     /// Ensure text ends with sentence-ending punctuation and a trailing space.
     private func finalize(_ text: String) -> String {
@@ -102,7 +105,8 @@ class AppState: ObservableObject {
                         self.transcribedText = text
                     }
                 } else {
-                    print("[AppState] final: \"\(text)\"")
+                    AppLog.shared.log("AppState", "final: \"\(text)\"")
+                    self.processingToken = nil
                     if !text.isEmpty {
                         self.applyAndInsert(text, recordingDuration: CFAbsoluteTimeGetCurrent() - self.recordingStartTime)
                     }
@@ -128,13 +132,28 @@ class AppState: ObservableObject {
 
     func stopListening() {
         guard phase == .listening, let session = currentSession else { return }
-        print("[AppState] === STOP → PROCESSING ===")
+        AppLog.shared.log("AppState", "=== STOP → PROCESSING ===")
         phase = .processing
         audioLevelMonitor.reset()
+
+        // Track this specific session so a stale fallback from a previous
+        // capture can't clobber a newer one.
+        let token = UUID()
+        processingToken = token
+
+        // Global fallback: the session (GPT path uploads via REST, which has its
+        // own 180s timeout + retries; native resolves quickly) is expected to
+        // always call back. This only recovers if it truly hangs, so keep it
+        // generous — a short fallback used to hide the overlay mid-upload on long
+        // audio, dropping the result.
+        let recordedDuration = CFAbsoluteTimeGetCurrent() - recordingStartTime
+        let fallback = max(200.0, recordedDuration + 60.0)
+
         session.stopAndTranscribe()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) { [weak self] in
-            guard let self = self, self.phase == .processing else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + fallback) { [weak self] in
+            guard let self = self, self.phase == .processing, self.processingToken == token else { return }
+            AppLog.shared.log("AppState", "fallback fired after \(Int(fallback))s — session never resolved")
             let text = self.transcribedText
             if !text.isEmpty {
                 self.applyAndInsert(text, recordingDuration: nil)
@@ -161,8 +180,9 @@ class AppState: ObservableObject {
 
     /// A capture couldn't be transcribed. Save the audio and surface retry UI.
     private func handleFailure(audioURL: URL, reason: String) {
-        print("[AppState] === FAILED: \(reason) ===")
+        AppLog.shared.log("AppState", "=== FAILED: \(reason) ===")
         VolumeManager.shared.restoreSystem()
+        processingToken = nil
         currentSession = nil
 
         let saved = failedStore?.add(

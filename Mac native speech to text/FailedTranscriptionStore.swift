@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import Combine
 
 struct FailedTranscription: Identifiable, Codable, Equatable {
     let id: UUID

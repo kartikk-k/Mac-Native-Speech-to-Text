@@ -68,6 +68,9 @@ enum FileTranscriber {
 
     // MARK: - OpenAI REST
 
+    /// Delegates to the shared `OpenAITranscriber` so the live path and the retry
+    /// path use exactly the same, tested upload code (long timeout, retry/backoff,
+    /// 25 MB guard, logging).
     private static func transcribeOpenAI(url: URL,
                                          model: String,
                                          completion: @escaping (Result<String, TranscriptionError>) -> Void) {
@@ -75,60 +78,13 @@ enum FileTranscriber {
             finish(.failure(TranscriptionError(message: "No OpenAI API key set")), completion)
             return
         }
-        guard let audioData = try? Data(contentsOf: url) else {
-            finish(.failure(TranscriptionError(message: "Could not read audio file")), completion)
-            return
-        }
-
-        let endpoint = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let boundary = "Boundary-\(UUID().uuidString)"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-
-        var body = Data()
-        func appendField(_ name: String, _ value: String) {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
-            body.append("\(value)\r\n".data(using: .utf8)!)
-        }
-
-        appendField("model", model)
-        appendField("response_format", "json")
-        appendField("language", "en")
-
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(url.lastPathComponent)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
-        body.append(audioData)
-        body.append("\r\n".data(using: .utf8)!)
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-
-        request.httpBody = body
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                finish(.failure(TranscriptionError(message: error.localizedDescription)), completion)
-                return
-            }
-            guard let data = data else {
-                finish(.failure(TranscriptionError(message: "Empty response from OpenAI")), completion)
-                return
-            }
-
-            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-            if let status = (response as? HTTPURLResponse)?.statusCode, status >= 400 {
-                let message = (json?["error"] as? [String: Any])?["message"] as? String ?? "HTTP \(status)"
-                finish(.failure(TranscriptionError(message: message)), completion)
-                return
-            }
-            if let text = json?["text"] as? String {
+        OpenAITranscriber.transcribe(fileURL: url, apiKey: apiKey, model: model) { result in
+            switch result {
+            case .success(let text):
                 finish(.success(text), completion)
-            } else {
-                finish(.failure(TranscriptionError(message: "Unexpected response from OpenAI")), completion)
+            case .failure(let error):
+                finish(.failure(TranscriptionError(message: error.message)), completion)
             }
-        }.resume()
+        }
     }
 }

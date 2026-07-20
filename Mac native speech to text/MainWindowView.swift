@@ -16,6 +16,7 @@ enum MainTab: String, CaseIterable {
     case stats = "Stats"
     case retry = "Retry"
     case settings = "Settings"
+    case logs = "Logs"
     case invite = "Invite"
 
     var icon: String {
@@ -26,6 +27,7 @@ enum MainTab: String, CaseIterable {
         case .stats: return "chart.bar.xaxis.ascending"
         case .retry: return "exclamationmark.arrow.circlepath"
         case .settings: return "gearshape.fill"
+        case .logs: return "doc.text.magnifyingglass"
         case .invite: return "person.badge.plus"
         }
     }
@@ -59,6 +61,8 @@ struct MainWindowView: View {
                             RetryTabView()
                         case .settings:
                             SettingsTabView(updaterManager: updaterManager)
+                        case .logs:
+                            LogsTabView()
                         case .invite:
                             InviteTabView()
                         }

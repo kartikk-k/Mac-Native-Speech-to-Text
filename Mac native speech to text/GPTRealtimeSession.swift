@@ -4,18 +4,17 @@
 //
 //  Created by Kartik Khorwal on 4/8/26.
 //
-//  Speech-to-text using OpenAI's Realtime transcription API.
+//  Speech-to-text using OpenAI. Despite the name, this no longer uses the
+//  Realtime WebSocket: this app records the whole utterance while a key is held
+//  and sends it once on release (it never needs live transcript deltas). For
+//  that pattern the reliable, cheaper path is the REST transcription endpoint
+//  (POST /v1/audio/transcriptions) — see OpenAITranscriber for the reasoning.
 //
-//  We open a WebSocket to the realtime endpoint with `intent=transcription`,
-//  so the session only ever produces text — no audio is generated or returned,
-//  which is exactly what we want here. Microphone audio is resampled to
-//  24 kHz mono PCM16 and streamed up as it's captured; on release we commit the
-//  buffer and wait for the final transcript. Streaming while the user holds the
-//  key is what makes this feel fast.
-//
-//  Every captured sample is also kept in memory so that, if the transcription
-//  fails (dropped connection, OpenAI error, timeout), we can persist the audio
-//  as a WAV and let the user retry it later — they never lose the recording.
+//  Flow: capture mic audio → resample to 24 kHz mono PCM16 → on release, gently
+//  trim long silences, write a WAV, and POST it. If it fails, the WAV is handed
+//  to the failed-capture store so the user can retry later — the audio is never
+//  lost. The class name and TranscriptionSession interface are kept so the rest
+//  of the app is unchanged.
 //
 
 import Foundation
@@ -40,27 +39,19 @@ final class GPTRealtimeSession: TranscriptionSession, @unchecked Sendable {
                                              channels: 1,
                                              interleaved: true)
 
-    private var urlSession: URLSession?
-    private var webSocket: URLSessionWebSocketTask?
-
     private let stateLock = NSLock()
     private var _isRecording = false
-    private var isConnected = false
-    private var awaitingFinal = false
     private var finished = false
-    private var connectionFailed = false
 
-    /// Interim (delta) transcript accumulated while the user is still speaking.
-    private var partialText = ""
-    /// Authoritative transcript from a `.completed` event.
-    private var finalTranscript = ""
-    /// Raw 24 kHz mono PCM16 of the whole capture, for retry-on-failure.
+    /// Raw 24 kHz mono PCM16 of the whole capture.
     private var recordedPCM = Data()
+    /// Log the first captured buffer once, to confirm the mic is producing audio.
+    private var loggedFirstBuffer = false
 
     private var recordingStartTime: CFAbsoluteTime = 0
-    private var finalTimeout: DispatchWorkItem?
 
     private var tag: String { String(id.uuidString.prefix(4)) }
+    private func log(_ msg: String) { AppLog.shared.log("GPT \(tag)", msg) }
 
     var isRecording: Bool {
         stateLock.lock(); defer { stateLock.unlock() }
@@ -83,12 +74,12 @@ final class GPTRealtimeSession: TranscriptionSession, @unchecked Sendable {
 
     func startRecording() {
         recordingStartTime = CFAbsoluteTimeGetCurrent()
-        print("[GPT \(tag)] start recording (model: \(model))")
-
-        connect()
+        log("start recording (model: \(model))")
 
         stateLock.lock()
         _isRecording = true
+        recordedPCM = Data()
+        loggedFirstBuffer = false
         stateLock.unlock()
 
         startAudioEngine()
@@ -96,51 +87,76 @@ final class GPTRealtimeSession: TranscriptionSession, @unchecked Sendable {
 
     func stopAndTranscribe() {
         let recordMs = Int((CFAbsoluteTimeGetCurrent() - recordingStartTime) * 1000)
-        print("[GPT \(tag)] stop recording [\(recordMs)ms]")
 
         stateLock.lock()
         let wasRecording = _isRecording
-        let failedEarly = connectionFailed
         _isRecording = false
-        awaitingFinal = true
+        let raw = recordedPCM
         stateLock.unlock()
 
         stopAudioEngine()
 
+        let rawMs = raw.count / 2 * 1000 / sampleRate
+        log("stop recording [\(recordMs)ms held, \(rawMs)ms audio captured]")
+
         guard wasRecording else {
-            finishFailure("Recording did not start")
+            finishFailure(pcm: Data(), "Recording did not start")
+            return
+        }
+        // An empty capture means the mic produced no audio (engine race, no input
+        // device, permissions). Surface it as an empty result — there is genuinely
+        // nothing to transcribe or save — but log loudly so the Logs tab shows it.
+        guard !raw.isEmpty else {
+            log("WARNING: no audio was captured (mic produced 0 samples) — check mic input")
+            finishSuccessEmpty()
             return
         }
 
-        if failedEarly {
-            finishFailure("Connection to OpenAI was lost")
+        // Gently trim long thinking-pauses (never drops quiet speech — see
+        // SilenceTrimmer). Then write a WAV and upload it.
+        let trimmed = SilenceTrimmer.trim(pcm16: raw, sampleRate: sampleRate)
+        let trimmedMs = trimmed.count / 2 * 1000 / sampleRate
+        log("after trim: \(trimmedMs)ms (removed \(rawMs - trimmedMs)ms)")
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("echotype-\(id.uuidString).wav")
+        do {
+            try WavWriter.write(pcm16: trimmed, sampleRate: sampleRate, channels: 1, to: url)
+        } catch {
+            log("could not write WAV: \(error.localizedDescription)")
+            // Fall back to failure with the untrimmed audio so nothing is lost.
+            finishFailure(pcm: raw, "Could not prepare audio")
             return
         }
 
-        // Commit whatever we've streamed so the server transcribes it.
-        send(["type": "input_audio_buffer.commit"])
-
-        // Safety net: don't wait forever for the final transcript. Kept under
-        // AppState's 10s global fallback so this path wins.
-        let timeout = DispatchWorkItem { [weak self] in
-            self?.finishFailure("Timed out waiting for transcription")
+        log("uploading to OpenAI…")
+        // Retain self STRONGLY through the upload. If we used [weak self] and the
+        // session were deallocated mid-upload (e.g. a new recording started), the
+        // result would vanish silently — no transcript, no failure, nothing in the
+        // failed list. Holding self guarantees exactly one terminal callback fires.
+        OpenAITranscriber.transcribe(fileURL: url, apiKey: apiKey, model: model) { result in
+            switch result {
+            case .success(let text):
+                let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                self.log("DONE → \"\(trimmedText)\"")
+                try? FileManager.default.removeItem(at: url)
+                self.finishSuccess(trimmedText)
+            case .failure(let error):
+                self.log("upload failed: \(error.message)")
+                // Hand the already-written WAV to the failed-capture store for retry.
+                self.finishFailure(savedURL: url, error.message)
+            }
         }
-        finalTimeout = timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8.0, execute: timeout)
     }
 
     func cancel() {
-        print("[GPT \(tag)] cancel")
+        log("cancel")
         stateLock.lock()
         _isRecording = false
         finished = true
-        awaitingFinal = false
+        recordedPCM = Data()
         stateLock.unlock()
-
-        finalTimeout?.cancel()
-        finalTimeout = nil
         stopAudioEngine()
-        teardownSocket()
     }
 
     // MARK: - Audio
@@ -153,24 +169,28 @@ final class GPTRealtimeSession: TranscriptionSession, @unchecked Sendable {
         let inputFormat = inputNode.outputFormat(forBus: 0)
 
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
-            print("[GPT \(tag)] ERROR: invalid audio format")
+            log("ERROR: invalid audio format")
             return
         }
 
         if let targetFormat = targetFormat {
             converter = AVAudioConverter(from: inputFormat, to: targetFormat)
+            if converter == nil {
+                log("ERROR: could not create audio converter (in \(inputFormat.sampleRate)Hz → 24kHz)")
+            }
         }
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
             self?.audioLevelMonitor?.process(buffer: buffer)
-            self?.streamAudio(buffer)
+            self?.captureAudio(buffer)
         }
 
         engine.prepare()
         do {
             try engine.start()
+            log("mic engine started (in: \(Int(inputFormat.sampleRate))Hz \(inputFormat.channelCount)ch)")
         } catch {
-            print("[GPT \(tag)] ERROR: engine start: \(error)")
+            log("ERROR: engine start: \(error.localizedDescription)")
         }
     }
 
@@ -182,15 +202,19 @@ final class GPTRealtimeSession: TranscriptionSession, @unchecked Sendable {
         audioEngine = nil
     }
 
-    /// Resample a captured buffer to 24 kHz mono PCM16, keep a copy for retry,
-    /// and stream it upstream.
-    private func streamAudio(_ buffer: AVAudioPCMBuffer) {
+    /// Resample a captured buffer to 24 kHz mono PCM16 and accumulate it.
+    private func captureAudio(_ buffer: AVAudioPCMBuffer) {
         stateLock.lock()
         let recording = _isRecording
         stateLock.unlock()
         guard recording,
               let converter = converter,
               let targetFormat = targetFormat else { return }
+
+        if !loggedFirstBuffer {
+            loggedFirstBuffer = true
+            log("first mic buffer received (\(buffer.frameLength) frames @ \(Int(buffer.format.sampleRate))Hz) — capture is live")
+        }
 
         let ratio = targetFormat.sampleRate / buffer.format.sampleRate
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1024
@@ -216,137 +240,7 @@ final class GPTRealtimeSession: TranscriptionSession, @unchecked Sendable {
 
         stateLock.lock()
         recordedPCM.append(data)
-        let connected = isConnected
         stateLock.unlock()
-
-        if connected {
-            send(["type": "input_audio_buffer.append", "audio": data.base64EncodedString()])
-        }
-    }
-
-    // MARK: - WebSocket
-
-    private func connect() {
-        guard let url = URL(string: "wss://api.openai.com/v1/realtime?intent=transcription") else { return }
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("realtime=v1", forHTTPHeaderField: "OpenAI-Beta")
-
-        let session = URLSession(configuration: .default)
-        self.urlSession = session
-        let task = session.webSocketTask(with: request)
-        self.webSocket = task
-        task.resume()
-
-        // Configure the session first, then start receiving events.
-        sendSessionConfig()
-        stateLock.lock()
-        isConnected = true
-        stateLock.unlock()
-        receiveLoop()
-    }
-
-    private func sendSessionConfig() {
-        // Transcription-only session: text out, no audio generation. Turn
-        // detection is disabled so we control when the buffer is committed
-        // (on key release), matching the app's hold-to-talk model.
-        let config: [String: Any] = [
-            "type": "transcription_session.update",
-            "session": [
-                "input_audio_format": "pcm16",
-                "input_audio_transcription": [
-                    "model": model,
-                    "language": "en"
-                ],
-                "turn_detection": NSNull()
-            ]
-        ]
-        send(config)
-    }
-
-    private func receiveLoop() {
-        webSocket?.receive { [weak self] result in
-            guard let self = self else { return }
-            switch result {
-            case .success(let message):
-                switch message {
-                case .string(let text):
-                    self.handleEvent(text)
-                case .data(let data):
-                    if let text = String(data: data, encoding: .utf8) {
-                        self.handleEvent(text)
-                    }
-                @unknown default:
-                    break
-                }
-                self.receiveLoop()
-            case .failure(let error):
-                self.handleSocketFailure(error.localizedDescription)
-            }
-        }
-    }
-
-    private func handleSocketFailure(_ message: String) {
-        stateLock.lock()
-        let done = self.finished
-        let waiting = self.awaitingFinal
-        self.isConnected = false
-        self.connectionFailed = true
-        stateLock.unlock()
-        guard !done else { return }
-        print("[GPT \(tag)] socket error: \(message)")
-        // If the user has already released, resolve now; otherwise stop() will
-        // resolve as a failure once they let go.
-        if waiting { finishFailure("Connection to OpenAI failed") }
-    }
-
-    private func handleEvent(_ text: String) {
-        guard let data = text.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = json["type"] as? String else { return }
-
-        switch type {
-        case "conversation.item.input_audio_transcription.delta":
-            if let delta = json["delta"] as? String, !delta.isEmpty {
-                stateLock.lock()
-                partialText += delta
-                let interim = finalTranscript.isEmpty ? partialText : finalTranscript
-                stateLock.unlock()
-                emitInterim(interim)
-            }
-
-        case "conversation.item.input_audio_transcription.completed":
-            if let transcript = json["transcript"] as? String {
-                stateLock.lock()
-                finalTranscript = transcript
-                partialText = ""
-                let waiting = awaitingFinal
-                stateLock.unlock()
-                print("[GPT \(tag)] transcript completed")
-                if waiting {
-                    finishSuccess(transcript)
-                } else {
-                    emitInterim(transcript)
-                }
-            }
-
-        case "error":
-            let message = (json["error"] as? [String: Any])?["message"] as? String ?? "OpenAI error"
-            print("[GPT \(tag)] API error: \(message)")
-            stateLock.lock()
-            let waiting = awaitingFinal
-            stateLock.unlock()
-            if waiting { finishFailure(message) }
-
-        default:
-            break
-        }
-    }
-
-    private func emitInterim(_ text: String) {
-        DispatchQueue.main.async { [weak self] in
-            self?.onResult(text, false)
-        }
     }
 
     // MARK: - Terminal delivery
@@ -355,79 +249,44 @@ final class GPTRealtimeSession: TranscriptionSession, @unchecked Sendable {
         stateLock.lock()
         if finished { stateLock.unlock(); return }
         finished = true
-        awaitingFinal = false
         stateLock.unlock()
-
-        finalTimeout?.cancel()
-        finalTimeout = nil
-
-        let totalMs = Int((CFAbsoluteTimeGetCurrent() - recordingStartTime) * 1000)
-        print("[GPT \(tag)] DONE [\(totalMs)ms] → \"\(text)\"")
-
-        teardownSocket()
-        DispatchQueue.main.async { [weak self] in
-            self?.onResult(text, true)
-        }
+        DispatchQueue.main.async { [weak self] in self?.onResult(text, true) }
     }
 
-    private func finishFailure(_ message: String) {
+    private func finishSuccessEmpty() {
         stateLock.lock()
         if finished { stateLock.unlock(); return }
         finished = true
-        awaitingFinal = false
-        let pcm = recordedPCM
         stateLock.unlock()
+        DispatchQueue.main.async { [weak self] in self?.onResult("", true) }
+    }
 
-        finalTimeout?.cancel()
-        finalTimeout = nil
-        teardownSocket()
-
-        print("[GPT \(tag)] FAILED: \(message)")
-
-        // Nothing recorded — nothing to save or retry. Treat as an empty result.
+    /// Failure with in-memory PCM: write a WAV first, then report.
+    private func finishFailure(pcm: Data, _ message: String) {
         guard !pcm.isEmpty else {
-            DispatchQueue.main.async { [weak self] in
-                self?.onResult("", true)
-            }
+            log("FAILED (no audio): \(message)")
+            finishSuccessEmpty()
             return
         }
-
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("echotype-\(id.uuidString).wav")
         do {
             try WavWriter.write(pcm16: pcm, sampleRate: sampleRate, channels: 1, to: url)
         } catch {
-            print("[GPT \(tag)] could not write WAV: \(error)")
-            DispatchQueue.main.async { [weak self] in
-                self?.onResult("", true)
-            }
+            log("FAILED and could not write WAV: \(error.localizedDescription)")
+            finishSuccessEmpty()
             return
         }
-
-        DispatchQueue.main.async { [weak self] in
-            self?.onFailure(url, message)
-        }
+        finishFailure(savedURL: url, message)
     }
 
-    private func teardownSocket() {
+    /// Failure with an already-written WAV on disk.
+    private func finishFailure(savedURL url: URL, _ message: String) {
         stateLock.lock()
-        isConnected = false
+        if finished { stateLock.unlock(); return }
+        finished = true
         stateLock.unlock()
-        webSocket?.cancel(with: .goingAway, reason: nil)
-        webSocket = nil
-        urlSession?.invalidateAndCancel()
-        urlSession = nil
-    }
-
-    // MARK: - Send helper
-
-    private func send(_ payload: [String: Any]) {
-        guard let socket = webSocket,
-              let data = try? JSONSerialization.data(withJSONObject: payload),
-              let text = String(data: data, encoding: .utf8) else { return }
-        socket.send(.string(text)) { [weak self] error in
-            guard let self = self, let error = error else { return }
-            self.handleSocketFailure(error.localizedDescription)
-        }
+        log("FAILED: \(message) (audio saved for retry)")
+        DispatchQueue.main.async { [weak self] in self?.onFailure(url, message) }
     }
 }

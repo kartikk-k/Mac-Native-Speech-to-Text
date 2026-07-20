@@ -12,6 +12,15 @@ class HotkeyMonitor {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var retryTimer: Timer?
+
+    /// The event tap runs on its OWN dedicated thread with its own run loop, NOT
+    /// the main run loop. A `.cgSessionEventTap` sits in the path of every system
+    /// keystroke: whatever run loop services it must never stall, or ALL keyboard
+    /// input across macOS freezes until the OS force-disables the tap. Keeping it
+    /// off the main thread means nothing the app does (audio, network, SwiftUI,
+    /// logging) can ever block global input.
+    private var tapThread: Thread?
+    private var tapRunLoop: CFRunLoop?
     private var isHotkeyHeld = false
     private var fnIsDown = false
     private let onHotkeyDown: () -> Void
@@ -31,8 +40,15 @@ class HotkeyMonitor {
     /// Whether the event tap is active
     var isRunning: Bool { eventTap != nil }
 
-    /// Whether hands-free mode is active (managed externally, read by event handler)
-    var isHandsFree = false
+    /// Whether hands-free mode is active. Written from the main thread (AppDelegate)
+    /// and read from the tap thread inside `handleEvent`, so it's lock-guarded to
+    /// avoid a cross-thread data race on the swallow logic.
+    private let flagLock = NSLock()
+    private var _isHandsFree = false
+    var isHandsFree: Bool {
+        get { flagLock.lock(); defer { flagLock.unlock() }; return _isHandsFree }
+        set { flagLock.lock(); _isHandsFree = newValue; flagLock.unlock() }
+    }
 
     /// Ignore the next Fn release (used when activating hands-free while Fn is held)
     private var ignoreFnRelease = false
@@ -60,8 +76,32 @@ class HotkeyMonitor {
     }
 
     func start() {
-        if eventTap != nil { return }
+        if eventTap != nil || tapThread != nil { return }
 
+        // Spin up a dedicated thread that owns the tap's run loop. See tapThread.
+        let thread = Thread { [weak self] in
+            guard let self = self else { return }
+            self.tapRunLoop = CFRunLoopGetCurrent()
+            let installed = self.installTap()
+            if installed {
+                // Run this thread's run loop forever to service the tap.
+                CFRunLoopRun()
+            }
+            // If install failed, the retry timer (scheduled on this run loop)
+            // keeps the loop alive; run it so retries can fire.
+            if !installed {
+                CFRunLoopRun()
+            }
+        }
+        thread.name = "com.echotype.hotkeytap"
+        thread.qualityOfService = .userInteractive
+        tapThread = thread
+        thread.start()
+    }
+
+    /// Create + enable the tap on the CURRENT run loop (the tap thread). Returns
+    /// false if creation failed (e.g. Accessibility not yet granted).
+    private func installTap() -> Bool {
         // Listen for flagsChanged (Fn), keyDown, and keyUp
         let eventMask: CGEventMask =
             (1 << CGEventType.flagsChanged.rawValue) |
@@ -82,7 +122,7 @@ class HotkeyMonitor {
         ) else {
             print("[HotkeyMonitor] Failed to create event tap — will retry when Accessibility is granted")
             startRetrying()
-            return
+            return false
         }
 
         stopRetrying()
@@ -91,20 +131,27 @@ class HotkeyMonitor {
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
 
-        print("[HotkeyMonitor] started — listening for Fn (hold) and Fn+Space (hands-free)")
+        print("[HotkeyMonitor] started on dedicated thread — Fn (hold) and Fn+Space (hands-free)")
+        return true
     }
 
     func stop() {
         stopRetrying()
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
-            if let source = runLoopSource {
-                CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+            if let source = runLoopSource, let loop = tapRunLoop {
+                CFRunLoopRemoveSource(loop, source, .commonModes)
             }
             eventTap = nil
             runLoopSource = nil
             print("[HotkeyMonitor] stopped")
         }
+        // Wake the tap thread's run loop so it can exit.
+        if let loop = tapRunLoop {
+            CFRunLoopStop(loop)
+        }
+        tapRunLoop = nil
+        tapThread = nil
     }
 
     // MARK: - Retry
@@ -115,7 +162,9 @@ class HotkeyMonitor {
             guard let self = self else { return }
             if AXIsProcessTrusted() {
                 print("[HotkeyMonitor] Accessibility now granted — retrying event tap")
-                self.start()
+                // We're already running on the tap thread's run loop; install
+                // directly rather than spawning another thread.
+                _ = self.installTap()
             }
         }
     }
