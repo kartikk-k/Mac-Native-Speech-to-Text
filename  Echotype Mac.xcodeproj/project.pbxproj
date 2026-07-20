@@ -15,9 +15,9 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		2D2A64132F86037F00B4E38E /* Mac native speech to text */ = {
+		2D2A64132F86037F00B4E38E /* EchotypeMac */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Mac native speech to text";
+			path = EchotypeMac;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -37,7 +37,7 @@
 		2D2A64082F86037F00B4E38E = {
 			isa = PBXGroup;
 			children = (
-				2D2A64132F86037F00B4E38E /* Mac native speech to text */,
+				2D2A64132F86037F00B4E38E /* EchotypeMac */,
 				2D2A64122F86037F00B4E38E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -66,13 +66,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				2D2A64132F86037F00B4E38E /* Mac native speech to text */,
+				2D2A64132F86037F00B4E38E /* EchotypeMac */,
 			);
 			name = " Echotype Mac";
 			packageProductDependencies = (
 				2D2A65002F86040000B4E38E /* Sparkle */,
 			);
-			productName = "Mac native speech to text";
+			productName = "Echotype Mac";
 			productReference = 2D2A64112F86037F00B4E38E /*  Echotype Mac.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -257,7 +257,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "Mac native speech to text/Mac_native_speech_to_text.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "EchotypeMac/Resources/EchotypeMac.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 2;
@@ -266,7 +266,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Mac native speech to text/Info.plist";
+				INFOPLIST_FILE = "EchotypeMac/Resources/Info.plist";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to listen to your speech for transcription.";
@@ -277,7 +277,8 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.peakhumanexperience.Mac-native-speech-to-text";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Echotype Mac";
+				INFOPLIST_KEY_CFBundleDisplayName = "Echotype Mac";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -293,7 +294,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "Mac native speech to text/Mac_native_speech_to_text.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "EchotypeMac/Resources/EchotypeMac.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 2;
@@ -302,7 +303,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Mac native speech to text/Info.plist";
+				INFOPLIST_FILE = "EchotypeMac/Resources/Info.plist";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to listen to your speech for transcription.";
@@ -313,7 +314,8 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.peakhumanexperience.Mac-native-speech-to-text";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Echotype Mac";
+				INFOPLIST_KEY_CFBundleDisplayName = "Echotype Mac";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
