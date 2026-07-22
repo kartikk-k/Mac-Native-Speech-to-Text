@@ -49,6 +49,14 @@ enum TranscriptionSettings {
         set { UserDefaults.standard.set(newValue, forKey: rephraseKey) }
     }
 
+    /// Show the menu bar icon (default ON). Users who prefer a hotkey-only,
+    /// icon-free experience can turn it off in Settings.
+    private static let showMenuBarKey = "setting_showMenuBarIcon"
+    static var showMenuBarIcon: Bool {
+        get { UserDefaults.standard.object(forKey: showMenuBarKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: showMenuBarKey) }
+    }
+
     /// True when any cleanup toggle is on AND an OpenAI key is present (the pass
     /// needs the API). If no key, cleanup is silently skipped.
     static var cleanupEnabled: Bool {

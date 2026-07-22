@@ -14,6 +14,8 @@ import AppKit
 
 struct HistoryTabView: View {
     @EnvironmentObject private var historyStore: HistoryStore
+    @EnvironmentObject private var appState: AppState
+    @ObservedObject private var player = AudioPreviewPlayer.shared
 
     @State private var copiedID: UUID?
     @State private var retryingID: UUID?
@@ -80,11 +82,22 @@ struct HistoryTabView: View {
                 // Header: date + metadata chips + actions
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.system(size: 13.5, weight: .medium))
-                            .foregroundStyle(.white)
+                        HStack(spacing: 6) {
+                            if entry.failed {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.orange)
+                            }
+                            Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.system(size: 13.5, weight: .medium))
+                                .foregroundStyle(.white)
+                        }
                         HStack(spacing: 8) {
-                            metaChip(icon: "textformat.123", text: "\(entry.wordCount) words")
+                            if entry.failed {
+                                metaChip(icon: "xmark.circle", text: "Failed")
+                            } else {
+                                metaChip(icon: "textformat.123", text: "\(entry.wordCount) words")
+                            }
                             if entry.durationSeconds > 0 {
                                 metaChip(icon: "timer", text: durationText(entry.durationSeconds))
                             }
@@ -97,13 +110,19 @@ struct HistoryTabView: View {
                     rowActions(for: entry)
                 }
 
-                // The inserted text (cleaned if present).
-                Text(entry.finalText)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.white.opacity(0.85))
-                    .textSelection(.enabled)
-                    .lineLimit(isExpanded ? nil : 3)
-                    .fixedSize(horizontal: false, vertical: true)
+                // Failed entry → show the error; otherwise the inserted text.
+                if entry.failed {
+                    Text(entry.errorMessage.isEmpty ? "Transcription failed — retry to try again." : entry.errorMessage)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Color.orange.opacity(0.8))
+                } else {
+                    Text(entry.finalText)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.white.opacity(0.85))
+                        .textSelection(.enabled)
+                        .lineLimit(isExpanded ? nil : 3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 // If cleanup changed the text, offer a raw/cleaned comparison.
                 if entry.wasCleaned {
@@ -129,10 +148,13 @@ struct HistoryTabView: View {
     private func rowActions(for entry: HistoryEntry) -> some View {
         HStack(spacing: 8) {
             if entry.hasAudio, let url = historyStore.audioURL(for: entry) {
-                dsCardButton(icon: "play.fill", label: "Play") {
-                    AudioPreviewPlayer.shared.play(url: url)
+                let playing = player.isPlaying(url)
+                dsCardButton(icon: playing ? "pause.fill" : "play.fill",
+                             label: playing ? "Pause" : "Play") {
+                    player.toggle(url: url)
                 }
-                // Re-transcribe the saved audio; result is copied to the clipboard.
+                // Retry: re-transcribe the saved audio. For a failed entry this
+                // fills it in place; for a good entry it copies the fresh text.
                 if retryingID == entry.id {
                     HStack(spacing: 6) {
                         LoadingSpinner(size: 12, lineWidth: 1.8)
@@ -143,14 +165,16 @@ struct HistoryTabView: View {
                     .padding(.horizontal, 12).padding(.vertical, 7)
                 } else {
                     dsCardButton(icon: retryNoticeID == entry.id ? "checkmark" : "arrow.clockwise",
-                                 label: retryNoticeID == entry.id ? "Copied" : "Retry") {
-                        retry(entry, url: url)
+                                 label: retryNoticeID == entry.id ? "Done" : "Retry") {
+                        retry(entry)
                     }
                 }
             }
-            dsCardButton(icon: copiedID == entry.id ? "checkmark" : "doc.on.doc",
-                         label: copiedID == entry.id ? "Copied" : "Copy") {
-                copy(entry.finalText, id: entry.id)
+            if !entry.failed {
+                dsCardButton(icon: copiedID == entry.id ? "checkmark" : "doc.on.doc",
+                             label: copiedID == entry.id ? "Copied" : "Copy") {
+                    copy(entry.finalText, id: entry.id)
+                }
             }
             Button {
                 historyStore.remove(entry)
@@ -165,21 +189,22 @@ struct HistoryTabView: View {
         }
     }
 
-    /// Re-transcribe the saved audio over REST and copy the fresh text.
-    private func retry(_ entry: HistoryEntry, url: URL) {
+    /// Re-transcribe the saved audio. Failed entries are filled in place; for a
+    /// successful entry, the fresh text is copied to the clipboard.
+    private func retry(_ entry: HistoryEntry) {
         retryingID = entry.id
-        FileTranscriber.transcribe(url: url, provider: .gptRealtime, model: entry.model) { result in
+        appState.retryHistory(entry) { success, text in
             retryingID = nil
-            if case .success(let text) = result {
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty {
-                    let pb = NSPasteboard.general
-                    pb.clearContents(); pb.setString(trimmed, forType: .string)
-                    retryNoticeID = entry.id
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        if retryNoticeID == entry.id { retryNoticeID = nil }
-                    }
-                }
+            guard success else { return }
+            retryNoticeID = entry.id
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                if retryNoticeID == entry.id { retryNoticeID = nil }
+            }
+            // For a successful (non-failed) entry, retry copies to clipboard.
+            // Failed entries fill in place (no copy) so the row now shows text.
+            if entry.failed == false, let text = text, !text.isEmpty {
+                let pb = NSPasteboard.general
+                pb.clearContents(); pb.setString(text, forType: .string)
             }
         }
     }
@@ -223,6 +248,7 @@ struct HistoryTabView: View {
 #Preview("History") {
     HistoryTabView()
         .environmentObject(HistoryStore())
+        .environmentObject(AppState())
         .frame(width: 700, height: 560)
         .background(Color.black)
 }

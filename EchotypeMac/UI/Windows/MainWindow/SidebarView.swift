@@ -20,12 +20,6 @@ struct SidebarView: View {
                     sectionHeader("Overview")
                     navSection(items: mainNav)
 
-                    if !failedStore.items.isEmpty {
-                        sectionHeader("Needs Attention")
-                            .padding(.top, 12)
-                        navSection(items: [.retry])
-                    }
-
                     sectionHeader("More")
                         .padding(.top, 12)
                     navSection(items: [.logs, .invite])
@@ -70,15 +64,6 @@ struct SidebarView: View {
                 .foregroundStyle(isSelected ? .white : Color.white.opacity(0.75))
 
             Spacer()
-
-            if tab == .retry && !failedStore.items.isEmpty {
-                Text("\(failedStore.items.count)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(Color.orange.opacity(0.85)))
-            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)

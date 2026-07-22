@@ -51,8 +51,6 @@ class AppState: ObservableObject {
     private var cleanupRetryText: String?
     /// Set to request the main window navigate to a specific tab.
     @Published var requestedTab: MainTab?
-    /// Set so the Retry tab can scroll to / highlight a specific failed item.
-    @Published var pendingFailedFocusID: UUID?
 
     let audioLevelMonitor = AudioLevelMonitor()
     private let speechManager = SpeechManager()
@@ -348,6 +346,19 @@ class AppState: ObservableObject {
         processingToken = nil
         currentSession = nil
 
+        let duration = CFAbsoluteTimeGetCurrent() - recordingStartTime
+
+        // Record the failure in History too, so everything lives in one place
+        // (a failed entry keeps its audio + a Retry). Copy the audio for history
+        // BEFORE the failedStore moves the original file.
+        historyStore?.addFailed(
+            reason: reason,
+            provider: .gptRealtime,
+            model: TranscriptionSettings.realtimeModel,
+            durationSeconds: duration,
+            audioSource: copyForHistory(audioURL)
+        )
+
         let saved = failedStore?.add(
             sourceURL: audioURL,
             provider: .gptRealtime,
@@ -366,6 +377,19 @@ class AppState: ObservableObject {
         }
     }
 
+    /// Duplicate a temp audio file so both History and the failed store can own a
+    /// copy (the failed store moves the original). Returns nil if it can't.
+    private func copyForHistory(_ url: URL) -> URL? {
+        let dest = FileManager.default.temporaryDirectory
+            .appendingPathComponent("echotype-histcopy-\(UUID().uuidString).wav")
+        do {
+            try FileManager.default.copyItem(at: url, to: dest)
+            return dest
+        } catch {
+            return nil
+        }
+    }
+
     /// Retry the most recent failure directly from the overlay. On success the
     /// text is inserted at the cursor, just like a normal capture.
     func retryLastFailed() {
@@ -380,6 +404,26 @@ class AppState: ObservableObject {
             } else {
                 // Stay in the failed state so the user can try again / open the app.
                 self.phase = .failed
+            }
+        }
+    }
+
+    /// Retry a FAILED history entry: re-transcribe its saved audio over REST and,
+    /// on success, fill the entry in place. Completion reports the fresh text (for
+    /// clipboard) on the main queue.
+    func retryHistory(_ entry: HistoryEntry, completion: @escaping (Bool, String?) -> Void) {
+        guard let store = historyStore, let url = store.audioURL(for: entry) else {
+            completion(false, nil); return
+        }
+        let provider = TranscriptionProvider(rawValue: entry.provider) ?? .gptRealtime
+        FileTranscriber.transcribe(url: url, provider: provider, model: entry.model) { result in
+            switch result {
+            case .success(let text):
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                store.markTranscribed(entry.id, rawText: trimmed, cleanedText: "")
+                completion(true, trimmed)
+            case .failure:
+                completion(false, nil)
             }
         }
     }
@@ -411,10 +455,9 @@ class AppState: ObservableObject {
         }
     }
 
-    /// Open the main app focused on the failed capture so the user can retry manually.
+    /// Open the app on the History page, where failed captures now live for retry.
     func openFailedInApp() {
-        pendingFailedFocusID = lastFailed?.id
-        requestedTab = .retry
+        requestedTab = .history
         onShowMainWindow?()
         phase = .hidden
         onHide?()

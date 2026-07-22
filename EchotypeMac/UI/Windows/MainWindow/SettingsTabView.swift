@@ -14,6 +14,7 @@ struct SettingsTabView: View {
     var updaterManager: UpdaterManager?
     @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
     @State private var showIndicator: Bool = UserDefaults.standard.object(forKey: "setting_showIndicator") as? Bool ?? true
+    @State private var showMenuBarIcon: Bool = TranscriptionSettings.showMenuBarIcon
     @State private var onDeviceOnly: Bool = UserDefaults.standard.object(forKey: "setting_onDeviceOnly") as? Bool ?? true
     @State private var selectedLanguage: String = "en-US"
     @State private var transcriptionProvider: TranscriptionProvider = TranscriptionSettings.provider
@@ -58,8 +59,28 @@ struct SettingsTabView: View {
                             launchAtLogin = SMAppService.mainApp.status == .enabled
                         }
                     }
+
+                    dsDivider()
+
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Show menu bar icon")
+                                .font(.system(size: 13.5))
+                                .foregroundStyle(.white)
+                            Text("The microphone icon and quick menu in the menu bar")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.white.opacity(0.40))
+                        }
+                        Spacer()
+                        Toggle("", isOn: $showMenuBarIcon)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                    }
+                    .onChange(of: showMenuBarIcon) { _, newValue in
+                        TranscriptionSettings.showMenuBarIcon = newValue
+                    }
                 }
-                
+
                 dsSectionHeader(icon: "waveform.circle", title: "Transcription Engine")
 
                 dsCard {
