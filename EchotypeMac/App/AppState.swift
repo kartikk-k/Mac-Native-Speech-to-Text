@@ -13,6 +13,10 @@ enum RecognitionPhase {
     case hidden
     case listening
     case processing
+    /// The transcript is done; the grammar/rephrase pass (2nd API call) is
+    /// running. Shown with its own spinner so it never looks like "nothing
+    /// happened" while text is being improved.
+    case cleaning
     case permissionDenied
     case failed
     /// Transcript succeeded and was pasted, but the grammar/rephrase pass failed.
@@ -55,14 +59,25 @@ class AppState: ObservableObject {
     private var currentSession: TranscriptionSession?
 
     var onHide: (() -> Void)?
+    /// Re-show the recording overlay (used to guarantee the spinner is visible
+    /// during the cleanup pass, in case the overlay was dismissed).
+    var onShow: (() -> Void)?
     var onShowOnboarding: (() -> Void)?
     var onShowMainWindow: (() -> Void)?
     var permissionManager: PermissionManager?
     var usageTracker: UsageTracker?
     var snippetManager: SnippetManager?
     var failedStore: FailedTranscriptionStore?
+    var historyStore: HistoryStore?
 
     private var recordingStartTime: CFAbsoluteTime = 0
+    /// Audio file for the in-flight capture (fed to history on success).
+    private var pendingAudioURL: URL?
+    /// Incremented on every startListening. A session's callbacks capture the
+    /// generation they were created in and are IGNORED if a newer session has
+    /// since started — otherwise a dead/failed session firing late would clobber
+    /// the current one's phase and leave the overlay stuck "loading".
+    private var sessionGeneration = 0
     /// Identifies the in-flight processing session so a stale fallback timer
     /// can't act on a session that already resolved (or was replaced).
     private var processingToken: UUID?
@@ -92,16 +107,27 @@ class AppState: ObservableObject {
     ///   • failed → insert the RAW text anyway, then show `.cleanupFailed` with a
     ///     reason + Retry (per the user's request — text is never lost).
     private func applyAndInsert(_ text: String, recordingDuration: Double?) {
-        // If cleanup will actually run, make sure the spinner is showing.
-        if TranscriptionSettings.cleanupEnabled, phase != .processing {
-            phase = .processing
+        // If the grammar/rephrase pass will run, show a dedicated "cleaning"
+        // spinner so the overlay never looks empty while the 2nd API call runs.
+        if TranscriptionSettings.cleanupEnabled {
+            phase = .cleaning
+            onShow?()
         }
 
         TextCleanup.clean(text) { [weak self] result in
             guard let self = self else { return }
             switch result {
-            case .skipped(let t), .cleaned(let t):
+            case .skipped(let t):
                 self.insertProcessed(t, recordingDuration: recordingDuration)
+                self.recordHistory(raw: text, cleaned: "", recordingDuration: recordingDuration)
+                self.cleanupFailureReason = nil
+                self.cleanupOutOfCredits = false
+                self.phase = .hidden
+                self.onHide?()
+
+            case .cleaned(let t):
+                self.insertProcessed(t, recordingDuration: recordingDuration)
+                self.recordHistory(raw: text, cleaned: t, recordingDuration: recordingDuration)
                 self.cleanupFailureReason = nil
                 self.cleanupOutOfCredits = false
                 self.phase = .hidden
@@ -110,6 +136,7 @@ class AppState: ObservableObject {
             case .failed(let original, let reason, let outOfCredits):
                 // Paste the raw transcript so nothing is lost…
                 self.insertProcessed(original, recordingDuration: recordingDuration)
+                self.recordHistory(raw: text, cleaned: "", recordingDuration: recordingDuration)
                 // …then surface the cleanup failure with a Retry.
                 self.cleanupRetryText = original
                 self.cleanupFailureReason = reason
@@ -118,6 +145,24 @@ class AppState: ObservableObject {
                 self.phase = .cleanupFailed
             }
         }
+    }
+
+    /// Save this transcription to the local history (last 100). Consumes the
+    /// pending audio file for this capture, if any.
+    private func recordHistory(raw: String, cleaned: String, recordingDuration: Double?) {
+        let audio = pendingAudioURL
+        pendingAudioURL = nil
+        historyStore?.add(
+            rawText: raw,
+            cleanedText: cleaned,
+            grammarApplied: TranscriptionSettings.fixGrammar,
+            rephraseApplied: TranscriptionSettings.rephrase,
+            model: TranscriptionSettings.usesGPTRealtime ? TranscriptionSettings.realtimeModel : TranscriptionProvider.native.displayName,
+            durationSeconds: recordingDuration ?? 0,
+            audioSource: audio
+        )
+        // The audio was copied into history; clean up the temp file.
+        if let audio = audio { try? FileManager.default.removeItem(at: audio) }
     }
 
     /// Post-process + snippets + finalize, then insert at the cursor.
@@ -179,20 +224,32 @@ class AppState: ObservableObject {
             return
         }
 
+        // Fully tear down ANY previous session — recording or not. A session that
+        // already stopped may still be waiting on a socket/timeout; if it fires
+        // later it must not touch the new session's state.
         if let old = currentSession {
-            if old.isRecording { old.cancel() }
+            old.cancel()
+            currentSession = nil
         }
+        // Invalidate every in-flight timeout/callback from the old generation.
+        sessionGeneration += 1
+        let generation = sessionGeneration
+        processingToken = nil
+        pendingAudioURL = nil
 
-        print("[AppState] === START ===")
+        AppLog.shared.log("AppState", "=== START (gen \(generation)) ===")
         phase = .listening
         transcribedText = ""
         recordingStartTime = CFAbsoluteTimeGetCurrent()
         VolumeManager.shared.muteSystem()
         audioLevelMonitor.reset()
 
+        // Ignore any callback from a session that's no longer the current one.
+        func isCurrent() -> Bool { generation == sessionGeneration }
+
         let session = speechManager.createSession(onResult: { [weak self] text, isFinal in
             DispatchQueue.main.async {
-                guard let self = self else { return }
+                guard let self = self, isCurrent() else { return }
 
                 if !isFinal {
                     if self.phase == .processing {
@@ -215,7 +272,13 @@ class AppState: ObservableObject {
             }
         }, onFailure: { [weak self] audioURL, reason in
             DispatchQueue.main.async {
-                self?.handleFailure(audioURL: audioURL, reason: reason)
+                guard let self = self, isCurrent() else { return }
+                self.handleFailure(audioURL: audioURL, reason: reason)
+            }
+        }, onAudioSaved: { [weak self] audioURL in
+            DispatchQueue.main.async {
+                guard let self = self, isCurrent() else { return }
+                self.pendingAudioURL = audioURL
             }
         }, audioLevelMonitor: audioLevelMonitor)
 
@@ -239,13 +302,13 @@ class AppState: ObservableObject {
         let token = UUID()
         processingToken = token
 
-        // Global fallback: the session (GPT path uploads via REST, which has its
-        // own 180s timeout + retries; native resolves quickly) is expected to
-        // always call back. This only recovers if it truly hangs, so keep it
-        // generous — a short fallback used to hide the overlay mid-upload on long
-        // audio, dropping the result.
+        // Global fallback so the overlay can NEVER get stuck "loading" forever.
+        // The streaming WebSocket resolves in seconds; the session also has its
+        // own 8s final-transcript timeout. Scale gently with audio length but cap
+        // it so a hang recovers fast instead of leaving the user staring at a
+        // spinner (the old 200s value felt exactly like "keeps loading").
         let recordedDuration = CFAbsoluteTimeGetCurrent() - recordingStartTime
-        let fallback = max(200.0, recordedDuration + 60.0)
+        let fallback = min(45.0, max(15.0, recordedDuration + 12.0))
 
         session.stopAndTranscribe()
 
@@ -253,12 +316,14 @@ class AppState: ObservableObject {
             guard let self = self, self.phase == .processing, self.processingToken == token else { return }
             AppLog.shared.log("AppState", "fallback fired after \(Int(fallback))s — session never resolved")
             let text = self.transcribedText
+            self.processingToken = nil
             if !text.isEmpty {
                 self.applyAndInsert(text, recordingDuration: nil)
+            } else {
+                self.phase = .hidden
+                self.onHide?()
             }
             VolumeManager.shared.restoreSystem()
-            self.phase = .hidden
-            self.onHide?()
         }
     }
 

@@ -15,6 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let snippetManager = SnippetManager()
     let updaterManager = UpdaterManager()
     let failedStore = FailedTranscriptionStore()
+    let historyStore = HistoryStore()
     private var hotkeyMonitor: HotkeyMonitor?
     private var overlayController: OverlayWindowController?
     private var onboardingController: OnboardingWindowController?
@@ -25,15 +26,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appState.usageTracker = usageTracker
         appState.snippetManager = snippetManager
         appState.failedStore = failedStore
+        appState.historyStore = historyStore
 
         overlayController = OverlayWindowController(appState: appState)
         onboardingController = OnboardingWindowController(permissionManager: permissionManager)
-        mainWindowController = MainWindowController(usageTracker: usageTracker, permissionManager: permissionManager, snippetManager: snippetManager, appState: appState, updaterManager: updaterManager, failedStore: failedStore)
+        mainWindowController = MainWindowController(usageTracker: usageTracker, permissionManager: permissionManager, snippetManager: snippetManager, appState: appState, updaterManager: updaterManager, failedStore: failedStore, historyStore: historyStore)
 
         appState.onHide = { [weak self] in
             self?.hotkeyMonitor?.isHandsFree = false
             self?.appState.isHandsFree = false
             self?.overlayController?.hideImmediately()
+        }
+
+        appState.onShow = { [weak self] in
+            self?.overlayController?.show()
         }
 
         appState.onShowOnboarding = { [weak self] in

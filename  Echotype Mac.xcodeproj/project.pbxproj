@@ -11,7 +11,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		2D2A64112F86037F00B4E38E /*  Echotype Mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = " Echotype Mac.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D2A64112F86037F00B4E38E /*  Echotype Mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = " Echotype Mac.app"; path = "Echotype Mac.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -257,7 +257,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "EchotypeMac/Resources/EchotypeMac.entitlements";
+				CODE_SIGN_ENTITLEMENTS = EchotypeMac/Resources/EchotypeMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 2;
@@ -266,7 +266,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "EchotypeMac/Resources/Info.plist";
+				INFOPLIST_FILE = EchotypeMac/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Echotype Mac";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to listen to your speech for transcription.";
@@ -278,7 +279,6 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.peakhumanexperience.Mac-native-speech-to-text";
 				PRODUCT_NAME = "Echotype Mac";
-				INFOPLIST_KEY_CFBundleDisplayName = "Echotype Mac";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -294,7 +294,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "EchotypeMac/Resources/EchotypeMac.entitlements";
+				CODE_SIGN_ENTITLEMENTS = EchotypeMac/Resources/EchotypeMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 2;
@@ -303,7 +303,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "EchotypeMac/Resources/Info.plist";
+				INFOPLIST_FILE = EchotypeMac/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Echotype Mac";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to listen to your speech for transcription.";
@@ -315,7 +316,6 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.peakhumanexperience.Mac-native-speech-to-text";
 				PRODUCT_NAME = "Echotype Mac";
-				INFOPLIST_KEY_CFBundleDisplayName = "Echotype Mac";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;

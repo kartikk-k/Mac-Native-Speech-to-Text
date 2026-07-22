@@ -107,6 +107,124 @@ enum OpenAITranscriber {
         send(request: request, attemptsLeft: 3, completion: completion)
     }
 
+    /// Streaming transcription. Uploads the WAV with `stream=true` and reports
+    /// partial text via `onDelta` as the server transcribes, then the final text
+    /// via `completion`. This is what makes dictation feel fast — text appears
+    /// progressively instead of after one long blocking request.
+    ///
+    /// Falls back to a clear failure on any error; the caller keeps the audio for
+    /// retry. `onDelta` and `completion` are delivered on the main queue.
+    static func transcribeStreaming(fileURL url: URL,
+                                    apiKey: String,
+                                    model: String,
+                                    onDelta: @escaping (String) -> Void,
+                                    completion: @escaping (Result<String, TranscribeError>) -> Void) {
+        guard let wavData = try? Data(contentsOf: url) else {
+            deliver(.failure(TranscribeError(message: "Could not read audio file")), completion)
+            return
+        }
+        guard !apiKey.isEmpty else {
+            deliver(.failure(TranscribeError(message: "No OpenAI API key set")), completion)
+            return
+        }
+        guard wavData.count <= maxUploadBytes else {
+            let mb = wavData.count / (1024 * 1024)
+            deliver(.failure(TranscribeError(message: "Recording is too long to transcribe (\(mb) MB, max 25 MB)")), completion)
+            return
+        }
+
+        let sizeMB = Double(wavData.count) / (1024 * 1024)
+        AppLog.shared.log("OpenAI", String(format: "stream upload %.2f MB, model=%@", sizeMB, model))
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(url: URL(string: "https://api.openai.com/v1/audio/transcriptions")!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+
+        var body = Data()
+        func field(_ name: String, _ value: String) {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(value)\r\n".data(using: .utf8)!)
+        }
+        field("model", model)
+        field("response_format", "json")
+        field("stream", "true")
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(url.lastPathComponent)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
+        body.append(wavData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let started = CFAbsoluteTimeGetCurrent()
+        Task {
+            do {
+                let (bytes, response) = try await streamSession.bytes(for: request)
+                if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+                    // Error responses aren't SSE — drain and parse as JSON.
+                    var data = Data()
+                    for try await b in bytes { data.append(b) }
+                    let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+                    let errObj = json?["error"] as? [String: Any]
+                    let msg = (errObj?["message"] as? String) ?? "HTTP \(http.statusCode)"
+                    let outOfCredits = http.statusCode == 429 &&
+                        ((errObj?["code"] as? String) == "insufficient_quota")
+                    AppLog.shared.log("OpenAI", "stream error HTTP \(http.statusCode): \(msg)")
+                    deliver(.failure(TranscribeError(message: outOfCredits ? "Out of OpenAI credits" : msg)), completion)
+                    return
+                }
+
+                var accumulated = ""
+                var final: String?
+                var firstDeltaLogged = false
+                for try await line in bytes.lines {
+                    // SSE: we only care about `data:` payloads.
+                    guard line.hasPrefix("data:") else { continue }
+                    let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+                    if payload == "[DONE]" { break }
+                    guard let d = payload.data(using: .utf8),
+                          let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                          let type = obj["type"] as? String else { continue }
+                    switch type {
+                    case "transcript.text.delta":
+                        if let delta = obj["delta"] as? String, !delta.isEmpty {
+                            accumulated += delta
+                            if !firstDeltaLogged {
+                                firstDeltaLogged = true
+                                let ms = Int((CFAbsoluteTimeGetCurrent() - started) * 1000)
+                                AppLog.shared.log("OpenAI", "first delta after \(ms)ms")
+                            }
+                            let snapshot = accumulated
+                            DispatchQueue.main.async { onDelta(snapshot) }
+                        }
+                    case "transcript.text.done":
+                        final = (obj["text"] as? String) ?? accumulated
+                    default:
+                        break
+                    }
+                }
+                let result = (final ?? accumulated).trimmingCharacters(in: .whitespacesAndNewlines)
+                let ms = Int((CFAbsoluteTimeGetCurrent() - started) * 1000)
+                AppLog.shared.log("OpenAI", "stream done in \(ms)ms, \(result.count) chars")
+                deliver(.success(result), completion)
+            } catch {
+                AppLog.shared.log("OpenAI", "stream failed: \(error.localizedDescription)")
+                deliver(.failure(TranscribeError(message: error.localizedDescription)), completion)
+            }
+        }
+    }
+
+    /// Separate session for the streaming path — no resource timeout cap so the
+    /// SSE stream can run to completion.
+    private static let streamSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 180
+        return URLSession(configuration: config)
+    }()
+
     private static func send(request: URLRequest,
                              attemptsLeft: Int,
                              completion: @escaping (Result<String, TranscribeError>) -> Void) {

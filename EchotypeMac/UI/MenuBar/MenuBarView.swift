@@ -21,6 +21,9 @@ struct MenuBarView: View {
             case .processing:
                 Text("Processing...")
                     .font(.headline)
+            case .cleaning:
+                Text("Improving...")
+                    .font(.headline)
             case .failed:
                 Text("Transcription failed — tap the pill to retry")
                     .font(.body)

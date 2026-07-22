@@ -25,12 +25,18 @@ class SpeechSession: TranscriptionSession, @unchecked Sendable {
 
     private var recordingStartTime: CFAbsoluteTime = 0
     private let onResult: (String, Bool) -> Void
+    /// Called with the recorded audio file once recording stops, so callers can
+    /// keep it in history.
+    private let onAudioSaved: ((URL) -> Void)?
     private weak var audioLevelMonitor: AudioLevelMonitor?
 
     var isRecording = false
 
-    init(onResult: @escaping (String, Bool) -> Void, audioLevelMonitor: AudioLevelMonitor? = nil) {
+    init(onResult: @escaping (String, Bool) -> Void,
+         onAudioSaved: ((URL) -> Void)? = nil,
+         audioLevelMonitor: AudioLevelMonitor? = nil) {
         self.onResult = onResult
+        self.onAudioSaved = onAudioSaved
         self.audioLevelMonitor = audioLevelMonitor
         self.speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     }
@@ -108,6 +114,10 @@ class SpeechSession: TranscriptionSession, @unchecked Sendable {
             cleanupFile()
             return
         }
+
+        // Hand the recorded audio to the caller (for history) while the temp file
+        // still exists — the caller copies it before we clean up.
+        onAudioSaved?(url)
 
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
             onResult("", true)
@@ -226,18 +236,22 @@ class SpeechManager: @unchecked Sendable {
     ///     be transcribed (used by the GPT Realtime engine for retry).
     func createSession(onResult: @escaping (String, Bool) -> Void,
                        onFailure: @escaping (URL, String) -> Void,
+                       onAudioSaved: ((URL) -> Void)? = nil,
                        audioLevelMonitor: AudioLevelMonitor? = nil) -> TranscriptionSession? {
         // Use GPT Realtime only when it's selected AND a key is present;
         // otherwise fall back to the built-in on-device recognizer.
         if TranscriptionSettings.usesGPTRealtime, let apiKey = TranscriptionSettings.openAIApiKey {
             return GPTRealtimeSession(
                 apiKey: apiKey,
-                model: TranscriptionSettings.model,
+                // Always the streaming Whisper model — it's the only one the
+                // realtime transcription WebSocket accepts.
+                model: TranscriptionSettings.realtimeModel,
                 onResult: onResult,
                 onFailure: onFailure,
+                onAudioSaved: onAudioSaved,
                 audioLevelMonitor: audioLevelMonitor
             )
         }
-        return SpeechSession(onResult: onResult, audioLevelMonitor: audioLevelMonitor)
+        return SpeechSession(onResult: onResult, onAudioSaved: onAudioSaved, audioLevelMonitor: audioLevelMonitor)
     }
 }

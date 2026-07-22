@@ -59,7 +59,17 @@ enum TranscriptionSettings {
     private static let keychainAccount = "openai-api-key"
 
     /// Default OpenAI Realtime transcription model.
-    static let defaultModel = "gpt-4o-transcribe"
+    static let defaultModel = "gpt-realtime-whisper"
+
+    /// Model used for the live realtime (WebSocket) transcription session. This
+    /// is always the streaming Whisper model — it's the only one that works over
+    /// the realtime transcription session and gives progressive deltas.
+    static let realtimeModel = "gpt-realtime-whisper"
+
+    /// Model used for retry-from-failed-list (REST /v1/audio/transcriptions).
+    /// gpt-realtime-whisper is WebSocket-only, so the REST retry path uses a
+    /// REST-capable transcription model instead.
+    static let restRetryModel = "gpt-4o-transcribe"
 
     static var provider: TranscriptionProvider {
         get {

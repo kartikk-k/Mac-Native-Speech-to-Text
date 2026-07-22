@@ -16,14 +16,16 @@ class MainWindowController: NSObject, NSWindowDelegate {
     private let appState: AppState
     private let updaterManager: UpdaterManager
     private let failedStore: FailedTranscriptionStore
+    private let historyStore: HistoryStore
 
-    init(usageTracker: UsageTracker, permissionManager: PermissionManager, snippetManager: SnippetManager, appState: AppState, updaterManager: UpdaterManager, failedStore: FailedTranscriptionStore) {
+    init(usageTracker: UsageTracker, permissionManager: PermissionManager, snippetManager: SnippetManager, appState: AppState, updaterManager: UpdaterManager, failedStore: FailedTranscriptionStore, historyStore: HistoryStore) {
         self.usageTracker = usageTracker
         self.permissionManager = permissionManager
         self.snippetManager = snippetManager
         self.appState = appState
         self.updaterManager = updaterManager
         self.failedStore = failedStore
+        self.historyStore = historyStore
     }
 
     func show() {
@@ -41,6 +43,7 @@ class MainWindowController: NSObject, NSWindowDelegate {
             .environment(snippetManager)
             .environmentObject(appState)
             .environmentObject(failedStore)
+            .environmentObject(historyStore)
         let hostingView = NSHostingView(rootView: mainView)
 
         let window = NSWindow(

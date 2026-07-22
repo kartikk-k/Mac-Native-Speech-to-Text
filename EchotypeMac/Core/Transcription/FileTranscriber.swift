@@ -25,7 +25,11 @@ enum FileTranscriber {
         case .native:
             transcribeNative(url: url, completion: completion)
         case .gptRealtime:
-            transcribeOpenAI(url: url, model: model, completion: completion)
+            // The live session uses gpt-realtime-whisper, which is WebSocket-only
+            // and can't transcribe an uploaded file. Retry over REST with a
+            // REST-capable transcription model instead.
+            let restModel = model.hasPrefix("gpt-realtime") ? TranscriptionSettings.restRetryModel : model
+            transcribeOpenAI(url: url, model: restModel, completion: completion)
         }
     }
 

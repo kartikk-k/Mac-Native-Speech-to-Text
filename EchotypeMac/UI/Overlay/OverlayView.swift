@@ -98,6 +98,17 @@ private struct WaveformContent: View {
                 LoadingSpinner(size: 14, lineWidth: 2)
                     .padding(.trailing, 4)
                     .opacity(0.6)
+            } else if appState.phase == .cleaning {
+                // Grammar/rephrase pass is running — show a spinner + label so it
+                // never looks like nothing is happening before the text appears.
+                HStack(spacing: 7) {
+                    LoadingSpinner(size: 14, lineWidth: 2)
+                        .opacity(0.7)
+                    Text("Improving…")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.85))
+                }
+                .padding(.trailing, 4)
             } else if appState.phase == .permissionDenied {
                 Button(action: {
                     appState.onShowOnboarding?()
