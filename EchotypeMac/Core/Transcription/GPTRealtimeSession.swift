@@ -68,6 +68,10 @@ final class GPTRealtimeSession: NSObject, TranscriptionSession, URLSessionWebSoc
     private var recordedPCM = Data()
     private var loggedFirstBuffer = false
 
+    /// Real-time gain control + noise gate so quiet/whispered/slow speech reaches
+    /// the model at a clear, consistent level.
+    private let enhancer = AudioEnhancer()
+
     /// Segments finalized by `.completed` events, joined for the final output.
     private var committedTranscript = ""
     /// Live delta text for the segment currently being transcribed.
@@ -108,6 +112,8 @@ final class GPTRealtimeSession: NSObject, TranscriptionSession, URLSessionWebSoc
         recordingStartTime = CFAbsoluteTimeGetCurrent()
         lastCommitTime = CFAbsoluteTimeGetCurrent()
         log("start recording (model: \(model))")
+
+        enhancer.reset()
 
         stateLock.lock()
         _isRecording = true
@@ -291,7 +297,11 @@ final class GPTRealtimeSession: NSObject, TranscriptionSession, URLSessionWebSoc
               let channelData = outBuffer.int16ChannelData else { return }
 
         let byteCount = Int(outBuffer.frameLength) * MemoryLayout<Int16>.size
-        let data = Data(bytes: channelData[0], count: byteCount)
+        let raw = Data(bytes: channelData[0], count: byteCount)
+
+        // Boost quiet/whispered/slow speech to a clear, consistent level and quiet
+        // the background BEFORE it's sent — this is what makes soft speech usable.
+        let data = enhancer.process(raw)
 
         stateLock.lock()
         recordedPCM.append(data)
