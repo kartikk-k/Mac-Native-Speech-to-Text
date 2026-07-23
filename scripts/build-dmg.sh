@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ─── Configuration ───────────────────────────────────────────────
 APP_NAME="Echotype Mac"
-SCHEME="Mac native speech to text"
+SCHEME="Echotype Mac"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT_FILE="$PROJECT_DIR/ Echotype Mac.xcodeproj"
 BUILD_DIR="$PROJECT_DIR/build"

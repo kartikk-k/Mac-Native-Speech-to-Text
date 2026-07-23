@@ -11,7 +11,7 @@ struct SidebarView: View {
     @Binding var selectedTab: MainTab
     @EnvironmentObject private var failedStore: FailedTranscriptionStore
 
-    private let mainNav: [MainTab] = [.home, .history, .learn, .snippets, .stats]
+    private let mainNav: [MainTab] = [.home, .history, .learn, .snippets]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,7 +22,7 @@ struct SidebarView: View {
 
                     sectionHeader("More")
                         .padding(.top, 12)
-                    navSection(items: [.logs, .invite])
+                    navSection(items: [.logs, .share])
                 }
                 .padding(.top, 16)
                 .padding(.bottom, 8)

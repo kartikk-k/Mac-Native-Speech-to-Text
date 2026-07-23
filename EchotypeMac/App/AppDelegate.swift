@@ -29,7 +29,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appState.historyStore = historyStore
 
         overlayController = OverlayWindowController(appState: appState)
-        onboardingController = OnboardingWindowController(permissionManager: permissionManager)
+        onboardingController = OnboardingWindowController(permissionManager: permissionManager, appState: appState)
+        onboardingController?.onFinished = { [weak self] in
+            self?.showMainWindow()
+        }
         mainWindowController = MainWindowController(usageTracker: usageTracker, permissionManager: permissionManager, snippetManager: snippetManager, appState: appState, updaterManager: updaterManager, failedStore: failedStore, historyStore: historyStore)
 
         appState.onHide = { [weak self] in
@@ -74,8 +77,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         hotkeyMonitor?.start()
 
-        // Show main window on launch (permission setup is embedded in the main window)
-        showMainWindow()
+        // First run → onboarding (resumes at the last reached step). Otherwise the
+        // main window. Onboarding's onFinished shows the main window afterward.
+        if TranscriptionSettings.hasCompletedOnboarding {
+            showMainWindow()
+        } else {
+            showOnboarding()
+        }
     }
 
     private func toggleHandsFree() {

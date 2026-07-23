@@ -23,6 +23,10 @@ class HotkeyMonitor {
     private var tapRunLoop: CFRunLoop?
     private var isHotkeyHeld = false
     private var fnIsDown = false
+
+    /// True while the custom (non-Fn) trigger key is held down.
+    private var customKeyDown = false
+
     private let onHotkeyDown: () -> Void
     private let onHotkeyUp: () -> Void
     private let onHandsFreeToggle: () -> Void
@@ -50,6 +54,14 @@ class HotkeyMonitor {
         set { flagLock.lock(); _isHandsFree = newValue; flagLock.unlock() }
     }
 
+    /// The active hold-to-record binding, reloaded live from Settings. Read on the
+    /// tap thread, written on main — lock-guarded.
+    private var _binding: HotkeyBinding = TranscriptionSettings.hotkeyBinding
+    private var binding: HotkeyBinding {
+        get { flagLock.lock(); defer { flagLock.unlock() }; return _binding }
+        set { flagLock.lock(); _binding = newValue; flagLock.unlock() }
+    }
+
     /// Ignore the next Fn release (used when activating hands-free while Fn is held)
     private var ignoreFnRelease = false
 
@@ -66,6 +78,13 @@ class HotkeyMonitor {
         self.onHotkeyUp = onHotkeyUp
         self.onHandsFreeToggle = onHandsFreeToggle
         self.onCancel = onCancel
+
+        // Reload the binding when the user changes it in Settings.
+        NotificationCenter.default.addObserver(
+            forName: TranscriptionSettings.hotkeyBindingChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.binding = TranscriptionSettings.hotkeyBinding
+        }
     }
 
     /// Open System Settings to the Keyboard pane
@@ -185,11 +204,22 @@ class HotkeyMonitor {
             return Unmanaged.passUnretained(event)
         }
 
+        let activeBinding = binding
+
         // MARK: Key up — track Space release
         if type == .keyUp {
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
             if keyCode == HotkeyMonitor.spaceKeyCode {
                 spaceIsDown = false
+            }
+            // Custom (non-Fn) hold key released → stop recording.
+            if !activeBinding.isFn && keyCode == activeBinding.keyCode && customKeyDown {
+                customKeyDown = false
+                if isHotkeyHeld && !isHandsFree {
+                    isHotkeyHeld = false
+                    DispatchQueue.main.async { [weak self] in self?.onHotkeyUp() }
+                }
+                return nil
             }
             // Swallow Space/Escape key-up if hands-free is active to avoid leaking to app
             if isHandsFree && (keyCode == HotkeyMonitor.spaceKeyCode || keyCode == HotkeyMonitor.escapeKeyCode) {
@@ -201,6 +231,21 @@ class HotkeyMonitor {
         // MARK: Key down handling
         if type == .keyDown {
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+
+            // Custom (non-Fn) hold key pressed with the required modifiers → start
+            // recording (mirrors Fn-down). Ignore auto-repeat while already held.
+            if !activeBinding.isFn && keyCode == activeBinding.keyCode {
+                let mods = event.flags.intersection(HotkeyBinding.relevantModifiers)
+                if mods == activeBinding.modifiers.intersection(HotkeyBinding.relevantModifiers) {
+                    if customKeyDown { return nil }  // swallow repeats
+                    customKeyDown = true
+                    if !isHandsFree {
+                        isHotkeyHeld = true
+                        DispatchQueue.main.async { [weak self] in self?.onHotkeyDown() }
+                    }
+                    return nil  // swallow so the key doesn't type
+                }
+            }
 
             // Fn+Space while not already in hands-free → toggle on (only on first press)
             if keyCode == HotkeyMonitor.spaceKeyCode && fnIsDown && !isHandsFree && !spaceIsDown {
@@ -251,8 +296,8 @@ class HotkeyMonitor {
             return Unmanaged.passUnretained(event)
         }
 
-        // MARK: Fn key (flagsChanged)
-        guard type == .flagsChanged else {
+        // MARK: Fn key (flagsChanged) — only when the binding IS Fn.
+        guard type == .flagsChanged, activeBinding.isFn else {
             return Unmanaged.passUnretained(event)
         }
 

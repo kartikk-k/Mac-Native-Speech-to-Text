@@ -22,6 +22,10 @@ class UsageTracker {
     var averageWordsPerMinute: Double = 0.0
     var totalRecordingSeconds: Double = 0.0
 
+    /// Single, rounded WPM value for display everywhere (Home, Stats, etc.) so the
+    /// same number always shows. Rounds rather than truncates.
+    var wordsPerMinute: Int { Int(averageWordsPerMinute.rounded()) }
+
     // MARK: - Private
 
     @ObservationIgnored

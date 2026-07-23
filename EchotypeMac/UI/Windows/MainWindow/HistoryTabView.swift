@@ -21,6 +21,26 @@ struct HistoryTabView: View {
     @State private var retryingID: UUID?
     @State private var retryNoticeID: UUID?
     @State private var expandedIDs: Set<UUID> = []
+    @State private var search = ""
+    @State private var confirmClear = false
+
+    /// Entries matching the search box (matches transcript text).
+    private var filtered: [HistoryEntry] {
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return historyStore.entries }
+        return historyStore.entries.filter {
+            $0.finalText.lowercased().contains(q) || $0.rawText.lowercased().contains(q)
+        }
+    }
+
+    /// Filtered entries grouped by day, newest day first, with a section title.
+    private var grouped: [(title: String, entries: [HistoryEntry])] {
+        let cal = Calendar.current
+        let groups = Dictionary(grouping: filtered) { cal.startOfDay(for: $0.createdAt) }
+        return groups.keys.sorted(by: >).map { day in
+            (title: dayTitle(day), entries: groups[day] ?? [])
+        }
+    }
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -30,25 +50,39 @@ struct HistoryTabView: View {
                         Text("History")
                             .font(.system(size: 22, weight: .bold))
                             .foregroundStyle(.white)
-                        Text("Your last \(HistoryStore.maxEntries) transcriptions — replay the audio, copy, or re-run cleanup.")
+                        Text("Your last \(HistoryStore.maxEntries) transcriptions — replay, copy, or re-transcribe.")
                             .font(.system(size: 13))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .foregroundStyle(Color.white.opacity(0.6))
                     }
                     Spacer()
                     if !historyStore.entries.isEmpty {
                         dsCardButton(icon: "trash", label: "Clear all") {
-                            historyStore.clearAll()
+                            confirmClear = true
                         }
                     }
                 }
-                .padding(.bottom, 20)
+                .padding(.bottom, 16)
+
+                if !historyStore.entries.isEmpty {
+                    searchField
+                        .padding(.bottom, 16)
+                }
 
                 if historyStore.entries.isEmpty {
                     emptyState
+                } else if filtered.isEmpty {
+                    noResults
                 } else {
-                    VStack(spacing: 10) {
-                        ForEach(historyStore.entries) { entry in
-                            row(for: entry)
+                    ForEach(grouped, id: \.title) { group in
+                        Text(group.title)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                            .padding(.top, 6)
+                            .padding(.bottom, 8)
+                        VStack(spacing: 10) {
+                            ForEach(group.entries) { entry in
+                                row(for: entry)
+                            }
                         }
                     }
                 }
@@ -57,6 +91,60 @@ struct HistoryTabView: View {
             .padding(.top, 32)
             .padding(.bottom, 48)
         }
+        .alert("Clear all history?", isPresented: $confirmClear) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear all", role: .destructive) { historyStore.clearAll() }
+        } message: {
+            Text("This permanently deletes all \(historyStore.entries.count) saved transcriptions and their audio. This can't be undone.")
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.white.opacity(0.4))
+            TextField("Search transcriptions", text: $search)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .foregroundStyle(.white)
+            if !search.isEmpty {
+                Button { search = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+                .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1))
+        )
+    }
+
+    private var noResults: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 28))
+                .foregroundStyle(Color.white.opacity(0.4))
+            Text("No matches for “\(search)”")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.white.opacity(0.6))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 50)
+    }
+
+    private func dayTitle(_ day: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(day) { return "Today" }
+        if cal.isDateInYesterday(day) { return "Yesterday" }
+        return day.formatted(date: .abbreviated, time: .omitted)
     }
 
     private var emptyState: some View {
@@ -92,17 +180,18 @@ struct HistoryTabView: View {
                                 .font(.system(size: 13.5, weight: .medium))
                                 .foregroundStyle(.white)
                         }
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             if entry.failed {
-                                metaChip(icon: "xmark.circle", text: "Failed")
+                                metaText("Failed")
                             } else {
-                                metaChip(icon: "textformat.123", text: "\(entry.wordCount) words")
+                                // Plain, readable: "43 words · 23s · Grammar"
+                                metaText("\(entry.wordCount) words")
                             }
                             if entry.durationSeconds > 0 {
-                                metaChip(icon: "timer", text: durationText(entry.durationSeconds))
+                                metaDot(); metaText(durationText(entry.durationSeconds))
                             }
                             if entry.wasCleaned {
-                                metaChip(icon: "wand.and.stars", text: cleanupLabel(entry))
+                                metaDot(); metaText(cleanupLabel(entry))
                             }
                         }
                     }
@@ -110,11 +199,11 @@ struct HistoryTabView: View {
                     rowActions(for: entry)
                 }
 
-                // Failed entry → show the error; otherwise the inserted text.
+                // Failed entry → muted error; otherwise the inserted text.
                 if entry.failed {
-                    Text(entry.errorMessage.isEmpty ? "Transcription failed — retry to try again." : entry.errorMessage)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(Color.orange.opacity(0.8))
+                    Text(entry.errorMessage.isEmpty ? "No transcript was produced — re-transcribe to try again." : entry.errorMessage)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.orange.opacity(0.7))
                 } else {
                     Text(entry.finalText)
                         .font(.system(size: 13))
@@ -122,27 +211,29 @@ struct HistoryTabView: View {
                         .textSelection(.enabled)
                         .lineLimit(isExpanded ? nil : 3)
                         .fixedSize(horizontal: false, vertical: true)
-                }
 
-                // If cleanup changed the text, offer a raw/cleaned comparison.
-                if entry.wasCleaned {
-                    Button(isExpanded ? "Hide original" : "Show original (raw)") {
-                        if isExpanded { expandedIDs.remove(entry.id) } else { expandedIDs.insert(entry.id) }
-                    }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.5))
+                    // Expand/collapse when the text is long (or show the raw
+                    // original once expanded, if cleanup changed it).
+                    if entry.finalText.count > 140 || entry.wasCleaned {
+                        Button(isExpanded ? "Show less" : (entry.wasCleaned ? "Show more · original" : "Show more")) {
+                            if isExpanded { expandedIDs.remove(entry.id) } else { expandedIDs.insert(entry.id) }
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.55))
 
-                    if isExpanded {
-                        Text(entry.rawText)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.white.opacity(0.5))
-                            .textSelection(.enabled)
-                            .padding(.top, 2)
+                        if isExpanded && entry.wasCleaned {
+                            Text("Original: \(entry.rawText)")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                                .textSelection(.enabled)
+                                .padding(.top, 2)
+                        }
                     }
                 }
             }
         }
+        .opacity(entry.failed ? 0.75 : 1)   // de-emphasize failures
     }
 
     private func rowActions(for entry: HistoryEntry) -> some View {
@@ -164,8 +255,11 @@ struct HistoryTabView: View {
                     }
                     .padding(.horizontal, 12).padding(.vertical, 7)
                 } else {
+                    // "Retry" for a failed capture; "Re-transcribe" for a good one
+                    // (re-running from audio, distinct from re-run-cleanup).
+                    let label = retryNoticeID == entry.id ? "Done" : (entry.failed ? "Retry" : "Re-transcribe")
                     dsCardButton(icon: retryNoticeID == entry.id ? "checkmark" : "arrow.clockwise",
-                                 label: retryNoticeID == entry.id ? "Done" : "Retry") {
+                                 label: label) {
                         retry(entry)
                     }
                 }
@@ -209,14 +303,18 @@ struct HistoryTabView: View {
         }
     }
 
-    private func metaChip(icon: String, text: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 9))
-            Text(text)
-                .font(.system(size: 10.5))
-        }
-        .foregroundStyle(Color.white.opacity(0.5))
+    /// Plain metadata text (e.g. "43 words"), dot-separated — clearer than the
+    /// old icon-prefixed chips.
+    private func metaText(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(Color.white.opacity(0.5))
+    }
+
+    private func metaDot() -> some View {
+        Text("·")
+            .font(.system(size: 11))
+            .foregroundStyle(Color.white.opacity(0.3))
     }
 
     private func cleanupLabel(_ entry: HistoryEntry) -> String {

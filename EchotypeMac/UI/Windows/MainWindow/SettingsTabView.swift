@@ -11,10 +11,12 @@ import Sparkle
 
 struct SettingsTabView: View {
     @Environment(PermissionManager.self) private var permissionManager
+    @EnvironmentObject private var appState: AppState
     var updaterManager: UpdaterManager?
     @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
     @State private var showIndicator: Bool = UserDefaults.standard.object(forKey: "setting_showIndicator") as? Bool ?? true
     @State private var showMenuBarIcon: Bool = TranscriptionSettings.showMenuBarIcon
+    @State private var hotkey: HotkeyBinding = TranscriptionSettings.hotkeyBinding
     @State private var onDeviceOnly: Bool = UserDefaults.standard.object(forKey: "setting_onDeviceOnly") as? Bool ?? true
     @State private var selectedLanguage: String = "en-US"
     @State private var transcriptionProvider: TranscriptionProvider = TranscriptionSettings.provider
@@ -108,9 +110,9 @@ struct SettingsTabView: View {
                                 Text("OpenAI API Key")
                                     .font(.system(size: 13.5))
                                     .foregroundStyle(.white)
-                                Text("Streams audio to GPT Realtime (text only, no audio) for faster transcription. Stored securely in your Keychain.")
+                                Text("Sends your speech to OpenAI for transcription. Only the resulting text is returned — no audio is stored. Your key is kept securely in your Keychain.")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(Color.white.opacity(0.40))
+                                    .foregroundStyle(Color.white.opacity(0.55))
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -141,10 +143,23 @@ struct SettingsTabView: View {
                             }
 
                             if !openAIKeySaved && !TranscriptionSettings.hasOpenAIKey {
-                                Text("No key saved — the built-in engine is used until you add one.")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(Color.orange.opacity(0.75))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                HStack(spacing: 8) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Color.orange)
+                                    Text("No API key yet — dictation falls back to the built-in macOS engine until you add one, so you're never left without transcription.")
+                                        .font(.system(size: 11.5))
+                                        .foregroundStyle(Color.orange.opacity(0.9))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(Color.orange.opacity(0.10))
+                                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1))
+                                )
                             }
                         }
                     }
@@ -219,23 +234,30 @@ struct SettingsTabView: View {
                             Text("Hotkey")
                                 .font(.system(size: 13.5))
                                 .foregroundStyle(.white)
-                            Text("Hold to record, release to transcribe")
+                            Text("Hold to record, release to transcribe. Click to change.")
                                 .font(.system(size: 11))
-                                .foregroundStyle(Color.white.opacity(0.40))
+                                .foregroundStyle(Color.white.opacity(0.55))
                         }
                         Spacer()
-                        HStack(spacing: 4) {
-                            Image(systemName: "globe")
-                            Text("Fn")
+                        HStack(spacing: 8) {
+                            HotkeyRecorderView(binding: $hotkey)
+                                .fixedSize()
+                                .onChange(of: hotkey) { _, newValue in
+                                    TranscriptionSettings.hotkeyBinding = newValue
+                                }
+                            if hotkey != .fn {
+                                Button {
+                                    hotkey = .fn
+                                    TranscriptionSettings.hotkeyBinding = .fn
+                                } label: {
+                                    Image(systemName: "arrow.uturn.backward")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.6))
+                                }
+                                .buttonStyle(.plain)
+                                .help("Reset to Fn")
+                            }
                         }
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.70))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(Color.white.opacity(0.08))
-                        )
                     }
                 }
                 
@@ -270,7 +292,28 @@ struct SettingsTabView: View {
                 .onDisappear {
                     permissionManager.stopPollingAccessibility()
                 }
-                
+
+                dsSectionHeader(icon: "sparkles", title: "Getting Started")
+
+                dsCard {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Replay setup")
+                                .font(.system(size: 13.5))
+                                .foregroundStyle(.white)
+                            Text("Walk through the welcome, permissions, and try-it steps again.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.white.opacity(0.55))
+                        }
+                        Spacer()
+                        dsCardButton(icon: "arrow.counterclockwise", label: "Replay") {
+                            TranscriptionSettings.hasCompletedOnboarding = false
+                            TranscriptionSettings.lastOnboardingStep = 0
+                            appState.onShowOnboarding?()
+                        }
+                    }
+                }
+
                 dsSectionHeader(icon: "info.circle", title: "About")
                 
                 dsCard {

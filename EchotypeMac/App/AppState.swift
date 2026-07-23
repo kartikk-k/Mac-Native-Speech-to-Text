@@ -148,6 +148,10 @@ class AppState: ObservableObject {
     /// Save this transcription to the local history (last 100). Consumes the
     /// pending audio file for this capture, if any.
     private func recordHistory(raw: String, cleaned: String, recordingDuration: Double?) {
+        // First successful dictation — lets Home + onboarding adapt.
+        if !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            TranscriptionSettings.firstDictationDone = true
+        }
         let audio = pendingAudioURL
         pendingAudioURL = nil
         historyStore?.add(

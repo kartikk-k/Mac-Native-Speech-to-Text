@@ -13,22 +13,20 @@ enum MainTab: String, CaseIterable {
     case home = "Home"
     case learn = "Learn"
     case snippets = "Snippets"
-    case stats = "Stats"
     case history = "History"
     case settings = "Settings"
     case logs = "Logs"
-    case invite = "Invite"
+    case share = "Share"
 
     var icon: String {
         switch self {
         case .home: return "house.fill"
         case .learn: return "graduationcap.fill"
         case .snippets: return "text.quote"
-        case .stats: return "chart.bar.xaxis.ascending"
         case .history: return "clock.arrow.circlepath"
         case .settings: return "gearshape.fill"
         case .logs: return "doc.text.magnifyingglass"
-        case .invite: return "person.badge.plus"
+        case .share: return "square.and.arrow.up"
         }
     }
 }
@@ -55,15 +53,13 @@ struct MainWindowView: View {
                             LearnTabView()
                         case .snippets:
                             SnippetsTabView()
-                        case .stats:
-                            StatsTabView()
                         case .history:
                             HistoryTabView()
                         case .settings:
                             SettingsTabView(updaterManager: updaterManager)
                         case .logs:
                             LogsTabView()
-                        case .invite:
+                        case .share:
                             InviteTabView()
                         }
                     }

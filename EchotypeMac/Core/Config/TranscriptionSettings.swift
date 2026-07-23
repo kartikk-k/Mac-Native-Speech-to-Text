@@ -57,10 +57,52 @@ enum TranscriptionSettings {
         set { UserDefaults.standard.set(newValue, forKey: showMenuBarKey) }
     }
 
+    /// The hold-to-record hotkey. Defaults to Fn (Globe). Changing it posts
+    /// `.hotkeyBindingChanged` so HotkeyMonitor can reload live.
+    static let hotkeyBindingChanged = Notification.Name("EchotypeHotkeyBindingChanged")
+    private static let hotkeyKey = "setting_hotkeyBinding"
+    static var hotkeyBinding: HotkeyBinding {
+        get {
+            if let raw = UserDefaults.standard.string(forKey: hotkeyKey),
+               let b = HotkeyBinding(storage: raw) { return b }
+            return .fn
+        }
+        set {
+            UserDefaults.standard.set(newValue.storageString, forKey: hotkeyKey)
+            NotificationCenter.default.post(name: hotkeyBindingChanged, object: nil)
+        }
+    }
+
     /// True when any cleanup toggle is on AND an OpenAI key is present (the pass
     /// needs the API). If no key, cleanup is silently skipped.
     static var cleanupEnabled: Bool {
         (fixGrammar || rephrase) && hasOpenAIKey
+    }
+
+    // MARK: - Onboarding
+
+    private static let onboardingDoneKey = "setting_hasCompletedOnboarding"
+    private static let firstDictationKey = "setting_firstDictationDone"
+    private static let onboardingStepKey = "setting_lastOnboardingStep"
+
+    /// True once the user has finished (or skipped) first-run onboarding.
+    static var hasCompletedOnboarding: Bool {
+        get { UserDefaults.standard.bool(forKey: onboardingDoneKey) }
+        set { UserDefaults.standard.set(newValue, forKey: onboardingDoneKey) }
+    }
+
+    /// True once the user has completed at least one successful dictation. Lets
+    /// Home adapt (e.g. collapse the how-to) and the onboarding "try it" step
+    /// know it succeeded.
+    static var firstDictationDone: Bool {
+        get { UserDefaults.standard.bool(forKey: firstDictationKey) }
+        set { UserDefaults.standard.set(newValue, forKey: firstDictationKey) }
+    }
+
+    /// Last onboarding step index reached, so an interrupted run resumes there.
+    static var lastOnboardingStep: Int {
+        get { UserDefaults.standard.integer(forKey: onboardingStepKey) }
+        set { UserDefaults.standard.set(newValue, forKey: onboardingStepKey) }
     }
 
     private static let keychainService = "com.peakhumanexperience.echotype.openai"

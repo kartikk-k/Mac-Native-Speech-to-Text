@@ -92,8 +92,18 @@ struct LearnTabView: View {
 
                 Text("Interactive tutorial — try each action and see it work in real time.")
                     .font(.system(size: 13))
-                    .foregroundStyle(Color.white.opacity(0.40))
-                    .padding(.bottom, 24)
+                    .foregroundStyle(Color.white.opacity(0.55))
+                    .padding(.bottom, 8)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 10.5))
+                    Text("These shortcuts use the Globe (Fn) key on Apple keyboards. On a keyboard without Fn/Globe, set a custom hotkey in Settings.")
+                        .font(.system(size: 11.5))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(Color.white.opacity(0.45))
+                .padding(.bottom, 24)
 
                 // Step pills
                 HStack(spacing: 8) {
@@ -389,14 +399,14 @@ struct LearnTabView: View {
                         .foregroundStyle(currentStep == step ? .white : Color.white.opacity(0.40))
                 }
 
-                if currentStep == step {
-                    Text(step.title)
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                }
+                // Always show the title so users know what each step is, not
+                // just an anonymous number.
+                Text(step.title)
+                    .font(.system(size: 11.5, weight: currentStep == step ? .medium : .regular))
+                    .foregroundStyle(currentStep == step ? .white : Color.white.opacity(0.6))
+                    .lineLimit(1)
             }
-            .padding(.horizontal, currentStep == step ? 12 : 8)
+            .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
                 Capsule()

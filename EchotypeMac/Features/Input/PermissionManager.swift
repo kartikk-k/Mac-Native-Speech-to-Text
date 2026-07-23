@@ -20,6 +20,17 @@ class PermissionManager {
         microphoneGranted && speechRecognitionGranted && accessibilityGranted
     }
 
+    /// True when the OS has denied a permission — the API can no longer re-prompt,
+    /// so the UI must deep-link to System Settings instead of showing "Grant".
+    var microphoneDenied: Bool {
+        let s = AVCaptureDevice.authorizationStatus(for: .audio)
+        return s == .denied || s == .restricted
+    }
+    var speechRecognitionDenied: Bool {
+        let s = SFSpeechRecognizer.authorizationStatus()
+        return s == .denied || s == .restricted
+    }
+
     @ObservationIgnored
     private var accessibilityTimer: Timer?
 
@@ -82,6 +93,11 @@ class PermissionManager {
         accessibilityTimer?.invalidate()
         accessibilityTimer = nil
     }
+
+    /// Deep-links to the exact System Settings pane (for denied permissions).
+    func openMicrophoneSettings() { openSystemSettings("Privacy_Microphone") }
+    func openSpeechRecognitionSettings() { openSystemSettings("Privacy_SpeechRecognition") }
+    func openAccessibilitySettings() { openSystemSettings("Privacy_Accessibility") }
 
     private func openSystemSettings(_ pane: String) {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") {

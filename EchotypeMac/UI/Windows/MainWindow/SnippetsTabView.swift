@@ -27,8 +27,17 @@ struct SnippetsTabView: View {
 
                 Text("When you say a trigger phrase, it gets replaced with your snippet text.")
                     .font(.system(size: 13))
-                    .foregroundStyle(Color.white.opacity(0.40))
-                    .padding(.bottom, 20)
+                    .foregroundStyle(Color.white.opacity(0.55))
+                    .padding(.bottom, 6)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 10.5))
+                    Text("Matching is case-insensitive and matches the phrase anywhere in your dictation.")
+                        .font(.system(size: 11.5))
+                }
+                .foregroundStyle(Color.white.opacity(0.45))
+                .padding(.bottom, 20)
 
                 // Add new snippet
                 dsSectionHeader(icon: "plus.circle", title: "Add Snippet")
@@ -73,28 +82,26 @@ struct SnippetsTabView: View {
 
                         HStack {
                             Spacer()
+                            let isValid = !newTrigger.trimmingCharacters(in: .whitespaces).isEmpty
+                                && !newReplacement.trimmingCharacters(in: .whitespaces).isEmpty
                             Button(action: addSnippet) {
                                 HStack(spacing: 6) {
                                     Image(systemName: "plus")
                                         .font(.system(size: 11.5, weight: .medium))
                                     Text("Add Snippet")
-                                        .font(.system(size: 12.5, weight: .medium))
+                                        .font(.system(size: 12.5, weight: .semibold))
                                 }
-                                .foregroundStyle(.white)
+                                .foregroundStyle(isValid ? Color.white : Color.white.opacity(0.45))
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 7)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(Color.white.opacity(0.12))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
-                                        )
+                                        .fill(isValid ? Color.accentColor : Color.white.opacity(0.08))
                                 )
                             }
                             .buttonStyle(.plain)
-                            .disabled(newTrigger.isEmpty || newReplacement.isEmpty)
-                            .opacity(newTrigger.isEmpty || newReplacement.isEmpty ? 0.4 : 1.0)
+                            .disabled(!isValid)
+                            .animation(.easeInOut(duration: 0.12), value: isValid)
                         }
                     }
                 }
