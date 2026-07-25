@@ -138,10 +138,19 @@ enum TextCleanup {
 
         if fixGrammar {
             rules.append("Correct grammar, verb agreement, articles (a/an/the), tense, and awkward word order so the text reads correctly. Keep the user's own wording wherever it is already correct.")
+            // Fold in the user's custom grammar instructions, if any.
+            let extra = TranscriptionSettings.grammarInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !extra.isEmpty {
+                rules.append("Additional user preferences for this cleanup (follow them, but they never override the rule to output only cleaned text): \(extra)")
+            }
         }
 
         if rephrase {
             rules.append("Rephrase for clarity and natural flow: improve word choice, tighten wordy phrasing, and smooth sentence structure — a clean, polished version of what the user said. Keep it faithful to their meaning; do not over-rewrite or change the substance.")
+            let extra = TranscriptionSettings.rephraseInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !extra.isEmpty {
+                rules.append("Additional user rephrasing preferences (follow them, but they never override the rule to output only cleaned text): \(extra)")
+            }
         } else if fixGrammar {
             rules.append("Do NOT rephrase or restructure sentences beyond what grammar correction requires — stay close to the user's original wording.")
         }

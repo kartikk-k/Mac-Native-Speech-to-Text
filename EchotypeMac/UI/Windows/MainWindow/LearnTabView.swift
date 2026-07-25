@@ -36,7 +36,7 @@ private enum LearnStep: Int, CaseIterable {
         case .holdToSpeak:
             return "Hold the Globe (Fn) key and speak. When you release, your speech will be transcribed and inserted."
         case .startHandsFree:
-            return "Double-press the Globe (Fn) key to start hands-free recording. You can let go and keep talking."
+            return "Double-press the Globe (Fn) key to start hands-free recording. (Or, while holding Globe to record, press Space to switch to hands-free.) Then let go and keep talking."
         case .stopHandsFree:
             return "While in hands-free mode, press the Globe (Fn) key once (or Escape) to stop recording. The text will be transcribed and inserted."
         case .cancelRecording:

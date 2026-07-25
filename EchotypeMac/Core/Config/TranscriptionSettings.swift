@@ -35,10 +35,10 @@ enum TranscriptionSettings {
     /// formatting). Cheap and fast; only invoked when a cleanup toggle is on.
     static let cleanupModel = "gpt-4o-mini"
 
-    /// Fix grammar while inserting (default ON). Runs a quick LLM cleanup pass
+    /// Fix grammar while inserting (default OFF). Runs a quick LLM cleanup pass
     /// that corrects grammar and formats lists, preserving the user's meaning.
     static var fixGrammar: Bool {
-        get { UserDefaults.standard.object(forKey: grammarKey) as? Bool ?? true }
+        get { UserDefaults.standard.object(forKey: grammarKey) as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: grammarKey) }
     }
 
@@ -47,6 +47,22 @@ enum TranscriptionSettings {
     static var rephrase: Bool {
         get { UserDefaults.standard.object(forKey: rephraseKey) as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: rephraseKey) }
+    }
+
+    /// Optional user instructions appended to the grammar-fix system prompt when
+    /// Fix grammar is on. E.g. "keep my casual tone", "use British spelling".
+    private static let grammarInstructionsKey = "setting_grammarInstructions"
+    static var grammarInstructions: String {
+        get { UserDefaults.standard.string(forKey: grammarInstructionsKey) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: grammarInstructionsKey) }
+    }
+
+    /// Optional user instructions appended to the rephrase system prompt when
+    /// Rephrase is on. E.g. "make it more concise", "professional tone".
+    private static let rephraseInstructionsKey = "setting_rephraseInstructions"
+    static var rephraseInstructions: String {
+        get { UserDefaults.standard.string(forKey: rephraseInstructionsKey) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: rephraseInstructionsKey) }
     }
 
     /// Show the menu bar icon (default ON). Users who prefer a hotkey-only,
@@ -137,15 +153,30 @@ enum TranscriptionSettings {
         set { UserDefaults.standard.set(newValue, forKey: modelKey) }
     }
 
-    /// The OpenAI API key, stored securely in the Keychain.
+    /// The OpenAI API key. Stored in the app config (UserDefaults) — intentionally
+    /// NOT the Keychain, to avoid the "wants to use your confidential information"
+    /// password prompt. (One-time migration reads any pre-existing Keychain value.)
+    private static let apiKeyDefaultsKey = "setting_openAIApiKey"
     static var openAIApiKey: String? {
-        get { KeychainHelper.read(service: keychainService, account: keychainAccount) }
+        get {
+            if let stored = UserDefaults.standard.string(forKey: apiKeyDefaultsKey), !stored.isEmpty {
+                return stored
+            }
+            // Migrate a legacy Keychain value once, then stop touching the Keychain.
+            if let legacy = KeychainHelper.read(service: keychainService, account: keychainAccount),
+               !legacy.isEmpty {
+                UserDefaults.standard.set(legacy, forKey: apiKeyDefaultsKey)
+                KeychainHelper.delete(service: keychainService, account: keychainAccount)
+                return legacy
+            }
+            return nil
+        }
         set {
             let trimmed = newValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if trimmed.isEmpty {
-                KeychainHelper.delete(service: keychainService, account: keychainAccount)
+                UserDefaults.standard.removeObject(forKey: apiKeyDefaultsKey)
             } else {
-                KeychainHelper.save(trimmed, service: keychainService, account: keychainAccount)
+                UserDefaults.standard.set(trimmed, forKey: apiKeyDefaultsKey)
             }
         }
     }
