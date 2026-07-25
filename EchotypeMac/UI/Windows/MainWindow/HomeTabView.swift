@@ -184,7 +184,7 @@ struct HomeTabView: View {
                 instructionRow(step: "2") { Text("Speak naturally — release to transcribe and insert") }
                 dsDivider()
                 instructionRow(step: "3") {
-                    HStack(spacing: 4) { Text("Press"); keycap("Fn"); Text("+"); keycap("Space"); Text("for hands-free") }
+                    HStack(spacing: 4) { Text("Double-press"); keycap("Fn"); Text("for hands-free") }
                 }
             }
         }

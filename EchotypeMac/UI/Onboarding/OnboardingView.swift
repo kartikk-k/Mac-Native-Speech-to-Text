@@ -284,7 +284,7 @@ struct OnboardingView: View {
             Spacer()
 
             VStack(alignment: .leading, spacing: 4) {
-                tip("Fn + Space for hands-free mode.")
+                tip("Double-press the Globe (Fn) key for hands-free mode.")
                 tip("Add Snippets in the app to expand phrases.")
             }
             .frame(maxWidth: .infinity, alignment: .leading)

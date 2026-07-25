@@ -36,9 +36,9 @@ private enum LearnStep: Int, CaseIterable {
         case .holdToSpeak:
             return "Hold the Globe (Fn) key and speak. When you release, your speech will be transcribed and inserted."
         case .startHandsFree:
-            return "Press Globe (Fn) + Space together to start hands-free recording. You can let go of all keys and keep talking."
+            return "Double-press the Globe (Fn) key to start hands-free recording. You can let go and keep talking."
         case .stopHandsFree:
-            return "While in hands-free mode, press Space or Escape to stop recording. The text will be transcribed and inserted."
+            return "While in hands-free mode, press the Globe (Fn) key once (or Escape) to stop recording. The text will be transcribed and inserted."
         case .cancelRecording:
             return "Press Delete (Backspace) while recording to cancel. Nothing will be transcribed or inserted."
         }
@@ -47,8 +47,8 @@ private enum LearnStep: Int, CaseIterable {
     var waitingPrompt: String {
         switch self {
         case .holdToSpeak: return "Hold the Fn key to start..."
-        case .startHandsFree: return "Press Fn + Space to start hands-free..."
-        case .stopHandsFree: return "First start hands-free mode (Fn + Space)..."
+        case .startHandsFree: return "Double-press the Globe (Fn) key to start hands-free..."
+        case .stopHandsFree: return "First start hands-free mode (double-press Globe)..."
         case .cancelRecording: return "Start recording (hold Fn or use hands-free)..."
         }
     }
@@ -57,7 +57,7 @@ private enum LearnStep: Int, CaseIterable {
         switch self {
         case .holdToSpeak: return "Recording! Speak now, then release Fn..."
         case .startHandsFree: return "Hands-free mode active!"
-        case .stopHandsFree: return "Now press Space or Escape to stop..."
+        case .stopHandsFree: return "Now press Globe (Fn) once (or Escape) to stop..."
         case .cancelRecording: return "Now press Delete to cancel..."
         }
     }
@@ -305,13 +305,13 @@ struct LearnTabView: View {
             if appState.isHandsFree {
                 return ("checkmark.circle.fill", currentStep.activePrompt, .green)
             } else if appState.phase == .listening {
-                return ("mic.fill", "Listening... now press Fn + Space", .orange)
+                return ("mic.fill", "Listening... now double-press Globe (Fn)", .orange)
             }
         case .stopHandsFree:
             if appState.isHandsFree {
                 return ("mic.fill", currentStep.activePrompt, .orange)
             } else if appState.phase == .listening && !handsFreeStartedForStop {
-                return ("mic.fill", "Now activate hands-free with Fn + Space...", .yellow)
+                return ("mic.fill", "Now activate hands-free by double-pressing Globe (Fn)...", .yellow)
             } else if appState.phase == .processing {
                 return ("waveform", "Processing...", .blue)
             }

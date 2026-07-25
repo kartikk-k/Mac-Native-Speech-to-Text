@@ -22,6 +22,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindowController: MainWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Free the Globe/Fn key for our hotkey by disabling the OS emoji picker.
+        SystemKeyConfig.disableEmojiPicker()
+
         appState.permissionManager = permissionManager
         appState.usageTracker = usageTracker
         appState.snippetManager = snippetManager
