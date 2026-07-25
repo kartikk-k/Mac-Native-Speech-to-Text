@@ -55,6 +55,12 @@ private struct WaveformContent: View {
     @ObservedObject var appState: AppState
     @ObservedObject var monitor: AudioLevelMonitor
 
+    /// Scale used for the one-shot "hands-free activated" bounce. Kicks up on
+    /// activation then springs back to 1, so the pill visibly pops when the user
+    /// latches hands-free while still holding & speaking — otherwise the switch
+    /// from hold-to-talk to hands-free is invisible.
+    @State private var handsFreeBounce: CGFloat = 1.0
+
     var body: some View {
         HStack(spacing: 10) {
             // Cancel button
@@ -236,6 +242,15 @@ private struct WaveformContent: View {
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
         .animation(.easeInOut(duration: 0.2), value: appState.phase)
+        .scaleEffect(handsFreeBounce)
+        .onChange(of: appState.isHandsFree) { _, isHandsFree in
+            guard isHandsFree else { return }
+            // Pop up instantly, then spring back down for a springy bounce.
+            handsFreeBounce = 1.18
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.45)) {
+                handsFreeBounce = 1.0
+            }
+        }
         .frame(maxWidth: .infinity)
     }
 

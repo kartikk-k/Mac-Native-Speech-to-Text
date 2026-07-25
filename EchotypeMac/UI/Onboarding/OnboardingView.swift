@@ -208,7 +208,7 @@ struct OnboardingView: View {
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06))
                             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.white.opacity(0.12), lineWidth: 1)))
-                    Text("Stored securely in your Keychain. Leave blank to stay on the built-in engine.")
+                    Text("Saved in the app settings on this Mac. Leave blank to stay on the built-in engine.")
                         .font(.system(size: 11))
                         .foregroundStyle(Color.white.opacity(0.5))
                 }
@@ -284,7 +284,7 @@ struct OnboardingView: View {
             Spacer()
 
             VStack(alignment: .leading, spacing: 4) {
-                tip("Double-press the Globe (Fn) key for hands-free mode.")
+                tip("Double-press Globe (Fn) for hands-free — or press Space while holding. Press Globe once to stop.")
                 tip("Add Snippets in the app to expand phrases.")
             }
             .frame(maxWidth: .infinity, alignment: .leading)

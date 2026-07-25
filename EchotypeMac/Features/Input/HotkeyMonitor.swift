@@ -34,6 +34,8 @@ class HotkeyMonitor {
 
     // Fn (Globe) key
     private static let fnKeyCode: Int64 = 63
+    // Space key — only used to promote a hold into hands-free (see keyDown).
+    private static let spaceKeyCode: Int64 = 49
     // Escape key
     private static let escapeKeyCode: Int64 = 53
     // Delete/Backspace key
@@ -210,8 +212,9 @@ class HotkeyMonitor {
                 }
                 return nil
             }
-            // Swallow Escape key-up while hands-free so it doesn't leak.
-            if isHandsFree && keyCode == HotkeyMonitor.escapeKeyCode {
+            // Swallow the key-up for the Space/Escape we consumed on key-down so
+            // they don't leak into the focused app.
+            if isHandsFree && (keyCode == HotkeyMonitor.escapeKeyCode || keyCode == HotkeyMonitor.spaceKeyCode) {
                 return nil
             }
             return Unmanaged.passUnretained(event)
@@ -234,6 +237,18 @@ class HotkeyMonitor {
                     }
                     return nil  // swallow so the key doesn't type
                 }
+            }
+
+            // Space while ACTIVELY HOLDING to record → promote to hands-free, so
+            // the user can release the key and keep talking (stop later with a
+            // single Globe press). Space does nothing otherwise — it types
+            // normally when not holding and never controls hands-free after this.
+            if keyCode == HotkeyMonitor.spaceKeyCode && isHotkeyHeld && !isHandsFree {
+                print("[HotkeyMonitor] >>> Space while holding — promote to hands-free")
+                pendingTapWork?.cancel(); pendingTapWork = nil
+                isHotkeyHeld = false  // hands-free owns the session now; Globe-up is a no-op
+                DispatchQueue.main.async { [weak self] in self?.onHandsFreeToggle() }
+                return nil  // swallow this one Space so it doesn't type
             }
 
             // Delete/Backspace → cancel only if actively recording.
@@ -285,69 +300,82 @@ class HotkeyMonitor {
     // release counts as a double-tap. A quick tap defers its "transcribe" briefly
     // so a second tap can upgrade it to a double-tap.
 
-    private static let doubleTapWindow: CFTimeInterval = 0.3
-    private var lastFnUpTime: CFTimeInterval = 0
+    /// Max gap between the two DOWN presses to count as a double-tap. Generous so
+    /// a natural double-press is reliably caught.
+    private static let doubleTapWindow: CFTimeInterval = 0.45
+    /// A press held at least this long is unambiguously a "hold" (transcribe on
+    /// release, no double-tap deferral).
+    private static let holdThreshold: CFTimeInterval = 0.5
+    private var lastFnDownTime: CFTimeInterval = 0
     private var fnDownTime: CFTimeInterval = 0
     private var pendingTapWork: DispatchWorkItem?
+    /// A short first tap is pending confirmation as either a single tap
+    /// (transcribe) or the first half of a double-tap (hands-free).
+    private var awaitingSecondTap = false
 
     private func handleFnDown() {
         fnIsDown = true
         let now = CFAbsoluteTimeGetCurrent()
-
-        // A second press soon after the last release = double-tap → hands-free.
-        if now - lastFnUpTime < HotkeyMonitor.doubleTapWindow {
-            // Cancel the pending "transcribe the first tap" work — instead of
-            // transcribing that brief first tap, we roll its recording straight
-            // into hands-free mode (no cancel/flicker: toggleHandsFree ON keeps an
-            // already-running session).
-            pendingTapWork?.cancel(); pendingTapWork = nil
-            isHotkeyHeld = false  // the hold is over; hands-free owns the session now
-            print("[HotkeyMonitor] >>> double-tap Globe — hands-free toggle")
-            DispatchQueue.main.async { [weak self] in self?.onHandsFreeToggle() }
-            lastFnUpTime = 0
-            return
-        }
-
-        // In hands-free mode, a fresh single press stops it.
-        if isHandsFree {
-            print("[HotkeyMonitor] >>> Globe press — hands-free OFF")
-            DispatchQueue.main.async { [weak self] in self?.onHandsFreeToggle() }
-            return
-        }
-
-        // Normal hold-to-talk: start recording now.
+        let sinceLastDown = now - lastFnDownTime
+        lastFnDownTime = now
         fnDownTime = now
+        log("Globe DOWN")
+
+        // Second press within the window of the first press = DOUBLE-TAP → hands-free.
+        if awaitingSecondTap && sinceLastDown < HotkeyMonitor.doubleTapWindow {
+            awaitingSecondTap = false
+            pendingTapWork?.cancel(); pendingTapWork = nil
+            isHotkeyHeld = false  // hands-free owns the (already-running) session now
+            log(">>> double-tap Globe — toggling hands-free")
+            DispatchQueue.main.async { [weak self] in self?.onHandsFreeToggle() }
+            return
+        }
+
+        // Single fresh press while hands-free → stop it.
+        if isHandsFree {
+            log(">>> Globe press — hands-free OFF")
+            DispatchQueue.main.async { [weak self] in self?.onHandsFreeToggle() }
+            return
+        }
+
+        // Normal press → start recording immediately (hold-to-talk).
         isHotkeyHeld = true
-        print("[HotkeyMonitor] >>> Globe DOWN (recording)")
         DispatchQueue.main.async { [weak self] in self?.onHotkeyDown() }
     }
 
     private func handleFnUp() {
         fnIsDown = false
-        lastFnUpTime = CFAbsoluteTimeGetCurrent()
+        log("Globe UP")
 
-        guard isHotkeyHeld else { return }  // e.g. release after a mode toggle
+        guard isHotkeyHeld else { return }  // release after a mode toggle → ignore
         let heldFor = CFAbsoluteTimeGetCurrent() - fnDownTime
 
-        if heldFor >= HotkeyMonitor.doubleTapWindow {
-            // Clearly a hold → transcribe immediately on release.
+        if heldFor >= HotkeyMonitor.holdThreshold {
+            // Clearly a hold → transcribe now.
             isHotkeyHeld = false
-            print("[HotkeyMonitor] <<< Globe UP (transcribe)")
+            awaitingSecondTap = false
+            log("<<< hold released — transcribe")
             DispatchQueue.main.async { [weak self] in self?.onHotkeyUp() }
-        } else {
-            // Short tap — could be the first half of a double-tap. Defer the
-            // transcribe briefly; a second press (handleFnDown) will cancel this.
-            let work = DispatchWorkItem { [weak self] in
-                guard let self = self, self.isHotkeyHeld else { return }
-                self.isHotkeyHeld = false
-                print("[HotkeyMonitor] <<< Globe tap (transcribe)")
-                DispatchQueue.main.async { self.onHotkeyUp() }
-                self.pendingTapWork = nil
-            }
-            pendingTapWork = work
-            DispatchQueue.global().asyncAfter(deadline: .now() + HotkeyMonitor.doubleTapWindow, execute: work)
+            return
         }
+
+        // Short tap → wait briefly to see if a second press makes it a double-tap.
+        // If not, transcribe this single tap.
+        awaitingSecondTap = true
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            guard self.awaitingSecondTap, self.isHotkeyHeld else { return }
+            self.awaitingSecondTap = false
+            self.isHotkeyHeld = false
+            self.log("<<< single tap — transcribe")
+            DispatchQueue.main.async { self.onHotkeyUp() }
+            self.pendingTapWork = nil
+        }
+        pendingTapWork = work
+        DispatchQueue.global().asyncAfter(deadline: .now() + HotkeyMonitor.doubleTapWindow, execute: work)
     }
+
+    private func log(_ msg: String) { AppLog.shared.log("Hotkey", msg) }
 
     deinit {
         stop()

@@ -24,6 +24,8 @@ struct SettingsTabView: View {
     @State private var openAIKeySaved: Bool = TranscriptionSettings.hasOpenAIKey
     @State private var fixGrammar: Bool = TranscriptionSettings.fixGrammar
     @State private var rephrase: Bool = TranscriptionSettings.rephrase
+    @State private var grammarInstructions: String = TranscriptionSettings.grammarInstructions
+    @State private var rephraseInstructions: String = TranscriptionSettings.rephraseInstructions
     
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -110,7 +112,7 @@ struct SettingsTabView: View {
                                 Text("OpenAI API Key")
                                     .font(.system(size: 13.5))
                                     .foregroundStyle(.white)
-                                Text("Sends your speech to OpenAI for transcription. Only the resulting text is returned — no audio is stored. Your key is kept securely in your Keychain.")
+                                Text("Sends your speech to OpenAI for transcription. Only the resulting text is returned — no audio is stored. Your key is saved in the app settings on this Mac.")
                                     .font(.system(size: 11))
                                     .foregroundStyle(Color.white.opacity(0.55))
                             }
@@ -178,6 +180,16 @@ struct SettingsTabView: View {
                         TranscriptionSettings.fixGrammar = newValue
                     }
 
+                    if fixGrammar {
+                        instructionField(
+                            placeholder: "Optional: extra grammar instructions — e.g. “use British spelling”, “keep my casual tone”",
+                            text: $grammarInstructions
+                        )
+                        .onChange(of: grammarInstructions) { _, v in
+                            TranscriptionSettings.grammarInstructions = v
+                        }
+                    }
+
                     dsDivider()
 
                     dsToggleRow(
@@ -188,6 +200,16 @@ struct SettingsTabView: View {
                     )
                     .onChange(of: rephrase) { _, newValue in
                         TranscriptionSettings.rephrase = newValue
+                    }
+
+                    if rephrase {
+                        instructionField(
+                            placeholder: "Optional: extra rephrasing instructions — e.g. “make it more concise”, “professional tone”",
+                            text: $rephraseInstructions
+                        )
+                        .onChange(of: rephraseInstructions) { _, v in
+                            TranscriptionSettings.rephraseInstructions = v
+                        }
                     }
 
                     if (fixGrammar || rephrase) && !TranscriptionSettings.hasOpenAIKey {
@@ -379,6 +401,34 @@ struct SettingsTabView: View {
         }
     }
     
+    /// Multi-line text area for optional custom cleanup instructions.
+    private func instructionField(placeholder: String, text: Binding<String>) -> some View {
+        ZStack(alignment: .topLeading) {
+            if text.wrappedValue.isEmpty {
+                Text(placeholder)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.white.opacity(0.35))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 8)
+                    .allowsHitTesting(false)
+            }
+            TextEditor(text: text)
+                .font(.system(size: 12))
+                .foregroundStyle(.white)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 54, maxHeight: 90)
+                .padding(4)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1))
+        )
+        .padding(.leading, 32)   // align under the toggle's text
+        .padding(.top, 2)
+    }
+
     private func settingsPermissionRow(icon: String, title: String, granted: Bool, action: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
