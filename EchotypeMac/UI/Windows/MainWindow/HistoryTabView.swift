@@ -297,22 +297,30 @@ struct HistoryTabView: View {
     }
 
     /// Re-transcribe the saved audio. Failed entries are filled in place; for a
-    /// successful entry, the fresh text is copied to the clipboard.
+    /// successful (re-transcribe) or cancelled (process) entry, the fresh text is
+    /// copied to the clipboard so the user gets what they came back for.
     private func retry(_ entry: HistoryEntry) {
         retryingID = entry.id
         appState.retryHistory(entry) { success, text in
             retryingID = nil
             guard success else { return }
-            retryNoticeID = entry.id
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                if retryNoticeID == entry.id { retryNoticeID = nil }
-            }
-            // For an already-transcribed entry, re-transcribe copies to clipboard.
-            // Failed / cancelled entries fill in place (no copy) so the row now
-            // shows the recovered text.
-            if !entry.needsProcessing, let text = text, !text.isEmpty {
+            // A cancelled capture the user is now processing, and an already-good
+            // entry being re-transcribed, both mean "I want this text" — copy it
+            // and surface a "Copied" indicator. A failed entry is only being
+            // recovered, so it just fills in place with no copy.
+            let shouldCopy = !entry.failed
+            if shouldCopy, let text = text, !text.isEmpty {
                 let pb = NSPasteboard.general
                 pb.clearContents(); pb.setString(text, forType: .string)
+                copiedID = entry.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    if copiedID == entry.id { copiedID = nil }
+                }
+            } else {
+                retryNoticeID = entry.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    if retryNoticeID == entry.id { retryNoticeID = nil }
+                }
             }
         }
     }
