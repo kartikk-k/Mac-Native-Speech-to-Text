@@ -20,7 +20,9 @@ struct MenuBarMenu: View {
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     // Mirror the persisted grammar setting so the toggle reflects/updates it.
-    @AppStorage("setting_fixGrammar") private var fixGrammar = true
+    // Default OFF to match TranscriptionSettings.fixGrammar (both cleanup passes
+    // are disabled by default).
+    @AppStorage("setting_fixGrammar") private var fixGrammar = false
 
     var body: some View {
         // Current status line.
