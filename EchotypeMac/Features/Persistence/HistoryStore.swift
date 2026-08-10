@@ -35,10 +35,17 @@ struct HistoryEntry: Identifiable, Codable, Equatable {
     /// True when transcription failed — this entry is a saved recording awaiting
     /// a retry rather than a completed transcript.
     var failed: Bool = false
+    /// True when the user cancelled the recording before it was transcribed. The
+    /// audio is kept (never processed) so it can be recovered later via "Process".
+    var cancelled: Bool = false
     /// Human-readable failure reason (only when `failed`).
     var errorMessage: String = ""
     /// Provider rawValue used for the capture (for retry).
     var provider: String = TranscriptionProvider.gptRealtime.rawValue
+
+    /// Entries that hold audio but no transcript yet (failed or user-cancelled).
+    /// These show a "Process" / "Retry" action rather than text + Copy.
+    var needsProcessing: Bool { failed || cancelled }
 
     /// The text actually inserted (cleaned if it differs, else raw).
     var finalText: String { cleanedText.isEmpty ? rawText : cleanedText }
@@ -50,6 +57,35 @@ struct HistoryEntry: Identifiable, Codable, Equatable {
     var hasAudio: Bool { !audioFileName.isEmpty }
     /// True when cleanup actually changed the text.
     var wasCleaned: Bool { !failed && !cleanedText.isEmpty && cleanedText != rawText }
+}
+
+// Custom decoding (in an extension so the memberwise initializer is preserved).
+// The additive fields — failed / cancelled / errorMessage / provider — were added
+// over time, so decode them leniently: entries written by an older build that
+// predates a field simply fall back to its default instead of failing the whole
+// history decode.
+extension HistoryEntry {
+    enum CodingKeys: String, CodingKey {
+        case id, audioFileName, rawText, cleanedText, grammarApplied, rephraseApplied
+        case model, createdAt, durationSeconds, failed, cancelled, errorMessage, provider
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        audioFileName = try c.decode(String.self, forKey: .audioFileName)
+        rawText = try c.decode(String.self, forKey: .rawText)
+        cleanedText = try c.decode(String.self, forKey: .cleanedText)
+        grammarApplied = try c.decode(Bool.self, forKey: .grammarApplied)
+        rephraseApplied = try c.decode(Bool.self, forKey: .rephraseApplied)
+        model = try c.decode(String.self, forKey: .model)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        durationSeconds = try c.decode(Double.self, forKey: .durationSeconds)
+        failed = try c.decodeIfPresent(Bool.self, forKey: .failed) ?? false
+        cancelled = try c.decodeIfPresent(Bool.self, forKey: .cancelled) ?? false
+        errorMessage = try c.decodeIfPresent(String.self, forKey: .errorMessage) ?? ""
+        provider = try c.decodeIfPresent(String.self, forKey: .provider) ?? TranscriptionProvider.gptRealtime.rawValue
+    }
 }
 
 final class HistoryStore: ObservableObject {
@@ -162,8 +198,44 @@ final class HistoryStore: ObservableObject {
         return entry
     }
 
-    /// After a successful retry of a failed entry, fill in the transcript and
-    /// clear the failed state (in place, keeping its position/audio).
+    /// Record a CANCELLED capture: the user stopped the recording before it was
+    /// transcribed. The audio is kept (never processed) so it can be recovered
+    /// later from History via "Process". Requires audio — nothing to keep without.
+    @discardableResult
+    func addCancelled(provider: TranscriptionProvider,
+                      model: String,
+                      durationSeconds: Double,
+                      audioSource: URL?) -> HistoryEntry? {
+        let id = UUID()
+        var fileName = ""
+        if let source = audioSource, fileManager.fileExists(atPath: source.path) {
+            let ext = source.pathExtension.isEmpty ? "wav" : source.pathExtension
+            fileName = "\(id.uuidString).\(ext)"
+            let dest = directory.appendingPathComponent(fileName)
+            do {
+                if fileManager.fileExists(atPath: dest.path) { try fileManager.removeItem(at: dest) }
+                // Move (not copy) — the source is a temp WAV we own.
+                try fileManager.moveItem(at: source, to: dest)
+            } catch {
+                try? fileManager.copyItem(at: source, to: dest)
+            }
+        }
+        guard !fileName.isEmpty else { return nil }  // nothing to recover without audio
+
+        let entry = HistoryEntry(
+            id: id, audioFileName: fileName, rawText: "", cleanedText: "",
+            grammarApplied: false, rephraseApplied: false, model: model,
+            createdAt: Date(), durationSeconds: durationSeconds,
+            failed: false, cancelled: true, errorMessage: "", provider: provider.rawValue
+        )
+        entries.insert(entry, at: 0)
+        prune()
+        save()
+        return entry
+    }
+
+    /// After a successful retry/process of a failed or cancelled entry, fill in
+    /// the transcript and clear the pending state (in place, keeping position/audio).
     func markTranscribed(_ id: UUID, rawText: String, cleanedText: String) {
         guard let idx = entries.firstIndex(where: { $0.id == id }) else { return }
         let old = entries[idx]
@@ -173,7 +245,7 @@ final class HistoryStore: ObservableObject {
             cleanedText: cleanedText.trimmingCharacters(in: .whitespacesAndNewlines),
             grammarApplied: old.grammarApplied, rephraseApplied: old.rephraseApplied,
             model: old.model, createdAt: old.createdAt, durationSeconds: old.durationSeconds,
-            failed: false, errorMessage: "", provider: old.provider
+            failed: false, cancelled: false, errorMessage: "", provider: old.provider
         )
         save()
     }

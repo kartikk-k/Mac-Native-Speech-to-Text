@@ -191,6 +191,36 @@ class SpeechSession: TranscriptionSession, @unchecked Sendable {
         cleanupFile()
     }
 
+    func stopAndArchive(completion: @escaping (URL?) -> Void) {
+        print("[Session \(id.uuidString.prefix(4))] stop and archive (cancelled — no transcription)")
+        doneTimer?.cancel(); doneTimer = nil
+        recognitionTask?.cancel(); recognitionTask = nil
+        if let engine = audioEngine, engine.isRunning {
+            engine.stop()
+            engine.inputNode.removeTap(onBus: 0)
+        }
+        audioEngine = nil
+        audioFile = nil
+        isRecording = false
+        isTranscribing = false
+
+        // Hand the recorded file to the caller instead of deleting it. Clear
+        // tempFileURL so cleanupFile() (if ever called) can't remove it.
+        let url = tempFileURL
+        tempFileURL = nil
+        guard let url = url else {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
+        guard fileSize > 0 else {
+            try? FileManager.default.removeItem(at: url)
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        DispatchQueue.main.async { completion(url) }
+    }
+
     private func resetDoneTimer(tStart: CFAbsoluteTime, recordDuration: Int) {
         doneTimer?.cancel()
         guard !completedSegments.isEmpty else { return }

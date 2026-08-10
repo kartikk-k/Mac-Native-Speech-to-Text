@@ -83,6 +83,7 @@ struct MenuBarMenu: View {
     private var statusText: String {
         switch appState.phase {
         case .listening: return "Listening…"
+        case .cancelPending: return "Cancelling — tap Continue to keep recording"
         case .processing: return "Transcribing…"
         case .cleaning: return "Improving…"
         case .failed: return "Last capture failed — retry in History"

@@ -18,6 +18,9 @@ struct MenuBarView: View {
             case .listening:
                 Text("Listening...")
                     .font(.headline)
+            case .cancelPending:
+                Text("Cancelling — tap Continue to keep recording")
+                    .font(.body)
             case .processing:
                 Text("Processing...")
                     .font(.headline)

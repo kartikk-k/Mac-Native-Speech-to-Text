@@ -40,7 +40,7 @@ private enum LearnStep: Int, CaseIterable {
         case .stopHandsFree:
             return "While in hands-free mode, press the Globe (Fn) key once (or Escape) to stop recording. The text will be transcribed and inserted."
         case .cancelRecording:
-            return "Press Delete (Backspace) while recording to cancel. Nothing will be transcribed or inserted."
+            return "Double-press Delete (Backspace) while recording to cancel. Nothing is transcribed, but the recording is kept in History — tap Continue within 5s, or recover it later with Process."
         }
     }
 
@@ -58,7 +58,7 @@ private enum LearnStep: Int, CaseIterable {
         case .holdToSpeak: return "Recording! Speak now, then release Fn..."
         case .startHandsFree: return "Hands-free mode active!"
         case .stopHandsFree: return "Now press Globe (Fn) once (or Escape) to stop..."
-        case .cancelRecording: return "Now press Delete to cancel..."
+        case .cancelRecording: return "Now double-press Delete to cancel..."
         }
     }
 
@@ -67,7 +67,7 @@ private enum LearnStep: Int, CaseIterable {
         case .holdToSpeak: return "You did it! Text was transcribed and inserted."
         case .startHandsFree: return "Hands-free mode activated!"
         case .stopHandsFree: return "You stopped hands-free and text was inserted."
-        case .cancelRecording: return "Recording cancelled — nothing was inserted."
+        case .cancelRecording: return "Recording cancelled — nothing was inserted, but it's saved in History."
         }
     }
 }

@@ -12,6 +12,10 @@ import AppKit
 enum RecognitionPhase {
     case hidden
     case listening
+    /// The user asked to cancel (double-press Delete). The recording keeps running
+    /// so "Continue" is instant, but a countdown is shown; if it lapses (or the
+    /// user confirms) the audio is archived to history unprocessed.
+    case cancelPending
     case processing
     /// The transcript is done; the grammar/rephrase pass (2nd API call) is
     /// running. Shown with its own spinner so it never looks like "nothing
@@ -37,6 +41,14 @@ class AppState: ObservableObject {
     @Published var transcribedText = ""
     @Published var isHandsFree = false
     @Published var lastEndReason: SessionEndReason = .none
+
+    /// Seconds left on the cancel-grace countdown (drives the "Continue (5…1)"
+    /// button in the overlay). Only meaningful while `phase == .cancelPending`.
+    @Published var cancelCountdown = 5
+
+    /// Length of the cancel-grace window, in seconds.
+    static let cancelGraceSeconds = 5
+    private var cancelTimer: Timer?
 
     /// The most recent failed capture awaiting retry (drives the overlay retry UI).
     @Published var lastFailed: FailedTranscription?
@@ -226,6 +238,16 @@ class AppState: ObservableObject {
             return
         }
 
+        // If a cancel-grace window was open, archive that recording to History
+        // before starting a fresh one (so it isn't silently discarded).
+        if cancelTimer != nil {
+            cancelTimer?.invalidate(); cancelTimer = nil
+            let graceSession = currentSession
+            currentSession = nil
+            let graceDuration = recordingStartTime > 0 ? CFAbsoluteTimeGetCurrent() - recordingStartTime : 0
+            archiveCancelled(graceSession, duration: graceDuration)
+        }
+
         // Fully tear down ANY previous session — recording or not. A session that
         // already stopped may still be waiting on a socket/timeout; if it fires
         // later it must not touch the new session's state.
@@ -329,16 +351,92 @@ class AppState: ObservableObject {
         }
     }
 
+    /// Enter the cancel-grace window (triggered by a double-press of Delete). The
+    /// recording keeps running in the background so "Continue" is seamless; a
+    /// 5-second countdown is shown. If it lapses — or the user confirms cancel —
+    /// the recording is stopped and archived to History unprocessed (never lost).
+    func requestCancel() {
+        guard phase == .listening, currentSession != nil else { return }
+        AppLog.shared.log("AppState", "=== CANCEL REQUESTED (grace) ===")
+        // The overlay is already visible throughout `.listening`, so just switch
+        // its content to the Continue / Cancel controls.
+        phase = .cancelPending
+        startCancelCountdown()
+    }
+
+    private func startCancelCountdown() {
+        cancelCountdown = AppState.cancelGraceSeconds
+        cancelTimer?.invalidate()
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.cancelCountdown -= 1
+            if self.cancelCountdown <= 0 {
+                self.finalizeCancel()
+            }
+        }
+        cancelTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    /// The user tapped "Continue recording" during the grace window — the session
+    /// never actually stopped, so just return to the listening UI.
+    func continueRecording() {
+        guard phase == .cancelPending else { return }
+        AppLog.shared.log("AppState", "=== CONTINUE (grace) ===")
+        cancelTimer?.invalidate(); cancelTimer = nil
+        phase = .listening
+    }
+
+    /// Finalize a cancellation (grace lapsed or user confirmed): stop the session
+    /// and keep the recording in History as an unprocessed entry the user can
+    /// process later. The audio is NEVER transcribed here and NEVER discarded.
+    func finalizeCancel() {
+        cancelListening()
+    }
+
+    /// Cancel the current capture. Stops the session and archives its audio to
+    /// History (unprocessed) so nothing is lost — the user can recover it later
+    /// via "Process". Safe to call from any phase.
     func cancelListening() {
         print("[AppState] === CANCEL ===")
+        cancelTimer?.invalidate(); cancelTimer = nil
         lastEndReason = .cancelled
-        currentSession?.cancel()
+
+        let session = currentSession
         currentSession = nil
+        // Invalidate any late callbacks from this session so a stray final
+        // transcript can't resurrect the overlay after we've cancelled.
+        sessionGeneration += 1
+        processingToken = nil
+
+        let duration = recordingStartTime > 0 ? CFAbsoluteTimeGetCurrent() - recordingStartTime : 0
+
         audioLevelMonitor.reset()
         VolumeManager.shared.restoreSystem()
         phase = .hidden
         transcribedText = ""
+        pendingAudioURL = nil
         onHide?()
+
+        // Archive the captured audio to History (unprocessed). Best-effort.
+        archiveCancelled(session, duration: duration)
+    }
+
+    /// Stop a session without transcribing and keep its audio in History as an
+    /// unprocessed ("cancelled") entry so nothing is ever lost.
+    private func archiveCancelled(_ session: TranscriptionSession?, duration: Double) {
+        guard let session = session else { return }
+        session.stopAndArchive { [weak self] url in
+            guard let self = self, let url = url else { return }
+            let usesGPT = TranscriptionSettings.usesGPTRealtime
+            self.historyStore?.addCancelled(
+                provider: usesGPT ? .gptRealtime : .native,
+                model: usesGPT ? TranscriptionSettings.realtimeModel : TranscriptionProvider.native.displayName,
+                durationSeconds: duration,
+                audioSource: url
+            )
+            AppLog.shared.log("AppState", "cancelled recording archived to history")
+        }
     }
 
     // MARK: - Failure & Retry

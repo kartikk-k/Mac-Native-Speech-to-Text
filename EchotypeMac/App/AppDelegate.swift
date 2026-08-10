@@ -75,7 +75,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.toggleHandsFree()
             },
             onCancel: { [weak self] in
-                self?.appState.cancelListening()
+                // Double-press Delete → open the cancel grace window (with a
+                // "Continue recording" option) rather than cancelling outright.
+                self?.appState.requestCancel()
             }
         )
         hotkeyMonitor?.start()
