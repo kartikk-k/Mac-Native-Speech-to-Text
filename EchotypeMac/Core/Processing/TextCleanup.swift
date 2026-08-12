@@ -82,7 +82,7 @@ enum TextCleanup {
         request.httpBody = body
         request.timeoutInterval = cleanupTimeout
 
-        session.dataTask(with: request) { data, response, error in
+        sendWithRetry(request) { data, response, error in
             if let error = error {
                 AppLog.shared.log("Cleanup", "network error (\(error.localizedDescription))")
                 deliver(.failed(original: text, reason: "\(feature) failed — no connection", outOfCredits: false), completion)
@@ -121,7 +121,7 @@ enum TextCleanup {
                 AppLog.shared.log("Cleanup", "empty content")
                 deliver(.failed(original: text, reason: "\(feature) failed", outOfCredits: false), completion)
             }
-        }.resume()
+        }
     }
 
     // MARK: - Prompt
@@ -171,6 +171,28 @@ enum TextCleanup {
         config.timeoutIntervalForResource = cleanupTimeout
         return URLSession(configuration: config)
     }()
+
+    /// POST the cleanup request, retrying ONCE on a transient
+    /// "network connection was lost" (NSURLErrorNetworkConnectionLost, -1005).
+    /// URLSession reuses pooled keep-alive sockets; when the server has already
+    /// closed one, the in-flight request fails with -1005 instead of transparently
+    /// retrying. This hit slow requests (rephrase, which rewrites more text) far
+    /// more than fast ones (grammar) — a one-shot retry on a fresh socket clears it.
+    private static func sendWithRetry(_ request: URLRequest,
+                                      attempt: Int = 0,
+                                      completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+        session.dataTask(with: request) { data, response, error in
+            let ns = error as NSError?
+            let isConnectionLost = ns?.domain == NSURLErrorDomain
+                && ns?.code == NSURLErrorNetworkConnectionLost
+            if isConnectionLost && attempt == 0 {
+                AppLog.shared.log("Cleanup", "connection lost (-1005) — retrying once on a fresh socket")
+                sendWithRetry(request, attempt: 1, completion: completion)
+                return
+            }
+            completion(data, response, error)
+        }.resume()
+    }
 
     private static func deliver(_ result: Result, _ completion: @escaping (Result) -> Void) {
         DispatchQueue.main.async { completion(result) }
