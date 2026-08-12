@@ -13,7 +13,13 @@ set -euo pipefail
 #   xcrun notarytool submit "build/Echotype Mac.dmg" --apple-id YOU --team-id HXV2NNGP22 --password APP_PW --wait
 #   xcrun stapler staple    "build/Echotype Mac.dmg"
 
+# VERSION is the human-facing marketing version (CFBundleShortVersionString).
+# BUILD is the monotonic build number (CFBundleVersion) — this is what Sparkle
+# actually compares to decide whether an update is newer, so it MUST go into
+# <sparkle:version>. Using the marketing string there breaks the comparison
+# (e.g. "1.2" reads as older than a running build number of 3).
 VERSION="1.2"
+BUILD="4"
 TAG="v${VERSION}"
 REPO="kartikk-k/Echotype-Mac"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -68,7 +74,7 @@ cat > "$APPCAST" <<XML
     <item>
       <title>Echotype Mac ${TAG}</title>
       <pubDate>${PUB_DATE}</pubDate>
-      <sparkle:version>${VERSION}</sparkle:version>
+      <sparkle:version>${BUILD}</sparkle:version>
       <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
       <description><![CDATA[
 ${NOTES_HTML}
