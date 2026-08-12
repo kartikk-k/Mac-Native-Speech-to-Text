@@ -6,14 +6,29 @@
     <description>Echotype Mac updates</description>
     <language>en</language>
     <item>
-      <title>Echotype Mac v1.0</title>
-      <pubDate>2026-04-24T12:44:53Z</pubDate>
-      <sparkle:version>1.0</sparkle:version>
-      <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
+      <title>Echotype Mac v1.2</title>
+      <pubDate>2026-08-12T13:07:46Z</pubDate>
+      <sparkle:version>1.2</sparkle:version>
+      <sparkle:shortVersionString>1.2</sparkle:shortVersionString>
+      <description><![CDATA[
+# Echotype Mac v1.2
+
+**New**
+- **Custom cleanup instructions** — Fix grammar and Rephrase each now have their own instructions field in Settings. Tell Echotype how to clean your text (&quot;use British spelling&quot;, &quot;keep my casual tone&quot;, &quot;make it more concise&quot;) and it folds those preferences into the cleanup pass.
+- **Auto-copy on process / re-transcribe** — Processing a cancelled recording (or re-transcribing) from History now copies the result to your clipboard and shows a &quot;Copied&quot; indicator, so the text you came back for is ready to paste.
+
+**Fixed**
+- **Rephrase reliability** — Rephrasing (and grammar+rephrase) would intermittently fail with a &quot;network connection was lost&quot; error on longer text. Cleanup now automatically retries once on that transient error, so it no longer surfaces to you.
+
+**Changed**
+- Grammar and Rephrase cleanup are both **off by default** for a clean out-of-the-box experience.
+- Delete-to-cancel now requires a double-press, keeps your audio, and offers a Continue option.
+      ]]></description>
       <enclosure
-        url="https://github.com/kartikk-k/Echotype-Mac/releases/download/v1.0/Echotype.Mac.dmg"
-        length="2644112"
+        url="https://github.com/kartikk-k/Echotype-Mac/releases/download/v1.2/Echotype.Mac.dmg"
+        length="3186783"
         type="application/octet-stream"
+        sparkle:edSignature="y2FhHiUNbAJaN9yd3oxVMIJDEvm6+grYH9d0QE/ovSev14YvoEtIByGeIKZ/PCIZtBjcqLkp8UMxZhh/7D0vDg=="
         sparkle:os="macos" />
     </item>
   </channel>

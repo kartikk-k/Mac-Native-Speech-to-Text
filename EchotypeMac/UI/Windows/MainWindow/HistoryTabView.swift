@@ -175,6 +175,10 @@ struct HistoryTabView: View {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .font(.system(size: 11))
                                     .foregroundStyle(Color.orange)
+                            } else if entry.cancelled {
+                                Image(systemName: "stop.circle")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.white.opacity(0.55))
                             }
                             Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
                                 .font(.system(size: 13.5, weight: .medium))
@@ -183,6 +187,8 @@ struct HistoryTabView: View {
                         HStack(spacing: 10) {
                             if entry.failed {
                                 metaText("Failed")
+                            } else if entry.cancelled {
+                                metaText("Cancelled")
                             } else {
                                 // Plain, readable: "43 words · 23s · Grammar"
                                 metaText("\(entry.wordCount) words")
@@ -199,11 +205,16 @@ struct HistoryTabView: View {
                     rowActions(for: entry)
                 }
 
-                // Failed entry → muted error; otherwise the inserted text.
+                // Failed / cancelled entries have no transcript yet — show a hint;
+                // otherwise the inserted text.
                 if entry.failed {
                     Text(entry.errorMessage.isEmpty ? "No transcript was produced — re-transcribe to try again." : entry.errorMessage)
                         .font(.system(size: 12))
                         .foregroundStyle(Color.orange.opacity(0.7))
+                } else if entry.cancelled {
+                    Text("Cancelled before processing — tap Process to transcribe this recording.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.white.opacity(0.5))
                 } else {
                     Text(entry.finalText)
                         .font(.system(size: 13))
@@ -233,7 +244,7 @@ struct HistoryTabView: View {
                 }
             }
         }
-        .opacity(entry.failed ? 0.75 : 1)   // de-emphasize failures
+        .opacity(entry.needsProcessing ? 0.85 : 1)   // de-emphasize un-processed captures
     }
 
     private func rowActions(for entry: HistoryEntry) -> some View {
@@ -255,16 +266,18 @@ struct HistoryTabView: View {
                     }
                     .padding(.horizontal, 12).padding(.vertical, 7)
                 } else {
-                    // "Retry" for a failed capture; "Re-transcribe" for a good one
-                    // (re-running from audio, distinct from re-run-cleanup).
-                    let label = retryNoticeID == entry.id ? "Done" : (entry.failed ? "Retry" : "Re-transcribe")
+                    // "Process" for a cancelled capture, "Retry" for a failed one,
+                    // "Re-transcribe" for a good one (re-running from audio, distinct
+                    // from re-run-cleanup).
+                    let action = entry.cancelled ? "Process" : (entry.failed ? "Retry" : "Re-transcribe")
+                    let label = retryNoticeID == entry.id ? "Done" : action
                     dsCardButton(icon: retryNoticeID == entry.id ? "checkmark" : "arrow.clockwise",
                                  label: label) {
                         retry(entry)
                     }
                 }
             }
-            if !entry.failed {
+            if !entry.needsProcessing {
                 dsCardButton(icon: copiedID == entry.id ? "checkmark" : "doc.on.doc",
                              label: copiedID == entry.id ? "Copied" : "Copy") {
                     copy(entry.finalText, id: entry.id)
@@ -284,21 +297,30 @@ struct HistoryTabView: View {
     }
 
     /// Re-transcribe the saved audio. Failed entries are filled in place; for a
-    /// successful entry, the fresh text is copied to the clipboard.
+    /// successful (re-transcribe) or cancelled (process) entry, the fresh text is
+    /// copied to the clipboard so the user gets what they came back for.
     private func retry(_ entry: HistoryEntry) {
         retryingID = entry.id
         appState.retryHistory(entry) { success, text in
             retryingID = nil
             guard success else { return }
-            retryNoticeID = entry.id
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                if retryNoticeID == entry.id { retryNoticeID = nil }
-            }
-            // For a successful (non-failed) entry, retry copies to clipboard.
-            // Failed entries fill in place (no copy) so the row now shows text.
-            if entry.failed == false, let text = text, !text.isEmpty {
+            // A cancelled capture the user is now processing, and an already-good
+            // entry being re-transcribed, both mean "I want this text" — copy it
+            // and surface a "Copied" indicator. A failed entry is only being
+            // recovered, so it just fills in place with no copy.
+            let shouldCopy = !entry.failed
+            if shouldCopy, let text = text, !text.isEmpty {
                 let pb = NSPasteboard.general
                 pb.clearContents(); pb.setString(text, forType: .string)
+                copiedID = entry.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    if copiedID == entry.id { copiedID = nil }
+                }
+            } else {
+                retryNoticeID = entry.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    if retryNoticeID == entry.id { retryNoticeID = nil }
+                }
             }
         }
     }

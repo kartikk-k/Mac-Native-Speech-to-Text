@@ -251,13 +251,30 @@ class HotkeyMonitor {
                 return nil  // swallow this one Space so it doesn't type
             }
 
-            // Delete/Backspace → cancel only if actively recording.
+            // Delete/Backspace while recording. A single press passes through as a
+            // normal backspace (so the user can edit while dictating); only a
+            // DOUBLE-press within the window requests a cancel. The recording is
+            // NOT stopped here — AppState opens a short "Continue?" grace window.
             if keyCode == HotkeyMonitor.deleteKeyCode && (isHotkeyHeld || isHandsFree) {
-                print("[HotkeyMonitor] >>> CANCEL (Delete)")
-                isHotkeyHeld = false
-                isHandsFree = false
-                DispatchQueue.main.async { [weak self] in self?.onCancel() }
-                return nil
+                // Holding Delete to backspace many chars auto-repeats — never treat
+                // a repeat as the second tap of the cancel gesture.
+                let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+                if isRepeat { return Unmanaged.passUnretained(event) }
+
+                let now = CFAbsoluteTimeGetCurrent()
+                if awaitingSecondDelete && (now - lastDeleteDownTime) < HotkeyMonitor.deleteDoubleTapWindow {
+                    // Second distinct press → cancel. Swallow this one so it doesn't
+                    // also delete a character. Recording state is left intact so the
+                    // user can still Continue.
+                    awaitingSecondDelete = false
+                    print("[HotkeyMonitor] >>> CANCEL requested (double Delete)")
+                    DispatchQueue.main.async { [weak self] in self?.onCancel() }
+                    return nil
+                }
+                // First press → arm the window and let it type (normal backspace).
+                awaitingSecondDelete = true
+                lastDeleteDownTime = now
+                return Unmanaged.passUnretained(event)
             }
 
             // In hands-free mode, Escape stops it (Space is no longer used).
@@ -312,6 +329,16 @@ class HotkeyMonitor {
     /// A short first tap is pending confirmation as either a single tap
     /// (transcribe) or the first half of a double-tap (hands-free).
     private var awaitingSecondTap = false
+
+    // MARK: - Delete double-tap (cancel)
+    //
+    // A SINGLE Delete now passes through as a normal backspace so the user can
+    // edit text while dictating (hands-free). Only a DOUBLE-press of Delete —
+    // two distinct presses within `deleteDoubleTapWindow` — requests a cancel,
+    // mirroring the double-Globe gesture. Tap-thread state, no locking needed.
+    private static let deleteDoubleTapWindow: CFTimeInterval = 0.4
+    private var lastDeleteDownTime: CFTimeInterval = 0
+    private var awaitingSecondDelete = false
 
     private func handleFnDown() {
         fnIsDown = true

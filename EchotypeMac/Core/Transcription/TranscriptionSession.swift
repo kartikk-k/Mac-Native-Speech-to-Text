@@ -21,4 +21,11 @@ protocol TranscriptionSession: AnyObject {
     func startRecording()
     func stopAndTranscribe()
     func cancel()
+
+    /// Stop recording immediately WITHOUT transcribing, persisting the captured
+    /// audio as a WAV so it can be kept in history and processed later. The
+    /// `completion` is called on the main queue with the saved file URL, or `nil`
+    /// if there was no audio to keep. Used by the "cancel (delete)" flow so a
+    /// cancelled recording is never lost.
+    func stopAndArchive(completion: @escaping (URL?) -> Void)
 }

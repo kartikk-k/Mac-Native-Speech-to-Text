@@ -198,6 +198,46 @@ final class GPTRealtimeSession: NSObject, TranscriptionSession, URLSessionWebSoc
         teardownSocket()
     }
 
+    func stopAndArchive(completion: @escaping (URL?) -> Void) {
+        log("stop and archive (cancelled — no transcription)")
+        stateLock.lock()
+        if finished {
+            stateLock.unlock()
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        finished = true
+        _isRecording = false
+        awaitingFinal = false
+        let pcm = recordedPCM
+        stateLock.unlock()
+
+        stopChunkTimer()
+        finalTimeout?.cancel(); finalTimeout = nil
+        stopAudioEngine()
+        teardownSocket()
+
+        guard !pcm.isEmpty else {
+            log("archive: no audio captured")
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        // Write the WAV off the main thread — a long capture can be several MB.
+        let sr = sampleRate
+        let fileId = id.uuidString
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("echotype-cancelled-\(fileId).wav")
+            do {
+                try WavWriter.write(pcm16: pcm, sampleRate: sr, channels: 1, to: url)
+                DispatchQueue.main.async { completion(url) }
+            } catch {
+                self?.log("archive: could not write WAV: \(error.localizedDescription)")
+                DispatchQueue.main.async { completion(nil) }
+            }
+        }
+    }
+
     // MARK: - Chunk timer (1-minute commits for long audio)
 
     private func startChunkTimer() {

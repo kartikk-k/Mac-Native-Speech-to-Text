@@ -20,7 +20,9 @@ struct MenuBarMenu: View {
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     // Mirror the persisted grammar setting so the toggle reflects/updates it.
-    @AppStorage("setting_fixGrammar") private var fixGrammar = true
+    // Default OFF to match TranscriptionSettings.fixGrammar (both cleanup passes
+    // are disabled by default).
+    @AppStorage("setting_fixGrammar") private var fixGrammar = false
 
     var body: some View {
         // Current status line.
@@ -83,6 +85,7 @@ struct MenuBarMenu: View {
     private var statusText: String {
         switch appState.phase {
         case .listening: return "Listening…"
+        case .cancelPending: return "Cancelling — tap Continue to keep recording"
         case .processing: return "Transcribing…"
         case .cleaning: return "Improving…"
         case .failed: return "Last capture failed — retry in History"

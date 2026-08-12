@@ -63,17 +63,20 @@ private struct WaveformContent: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            // Cancel button
-            Button(action: {
-                appState.cancelListening()
-            }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.7))
-                    .frame(width: 22, height: 22)
-                    .background(Circle().fill(Color.white.opacity(0.15)))
+            // Leading cancel button. Hidden during the cancel-grace window, which
+            // shows its own Continue / Cancel controls.
+            if appState.phase != .cancelPending {
+                Button(action: {
+                    appState.cancelListening()
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(Color.white.opacity(0.15)))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
             // Center content
             if appState.phase == .listening {
@@ -99,6 +102,46 @@ private struct WaveformContent: View {
                         .background(Circle().fill(Color.white.opacity(0.15)))
                 }
                 .buttonStyle(.plain)
+
+            } else if appState.phase == .cancelPending {
+                // Recording was stopped by a double-press of Delete. Offer to
+                // continue (with a countdown) before it's saved to History
+                // unprocessed. Auto-dismisses when the countdown reaches zero.
+                HStack(spacing: 8) {
+                    Button(action: {
+                        appState.continueRecording()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "mic.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text("Continue")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("\(appState.cancelCountdown)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(width: 16, height: 16)
+                                .background(Circle().fill(Color.white.opacity(0.28)))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(Color.white.opacity(0.22)))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: {
+                        appState.finalizeCancel()
+                    }) {
+                        Text("Cancel")
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.75))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(Color.white.opacity(0.10)))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.trailing, 2)
 
             } else if appState.phase == .processing {
                 LoadingSpinner(size: 14, lineWidth: 2)
